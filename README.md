@@ -5,6 +5,8 @@
 
 Browser tests and automations as small **scenario files** (JSON or Markdown), organised in **projects**, with optional JavaScript where you need it. Plain Playwright + Chromium underneath. Experimental AI can draft scenarios and repair broken selectors.
 
+![scenario-browser terminal demo](docs/demo.gif)
+
 > **Use it only on sites you own or are explicitly allowed to automate.**
 > It does not solve captchas, evade bot detection, or spoof fingerprints, and will not accept contributions that do.
 
@@ -24,7 +26,7 @@ npx scenario-browser project init my-tests
 npx scenario-browser project run --dir my-tests --tag smoke       # opens my-tests/reports/report.html afterwards
 ```
 
-In a clone, replace `npx scenario-browser` with `node src/cli.ts` (Node 23.6+ runs the TypeScript directly). A terminal demo script is in `scripts/demo.sh`.
+In a clone, replace `npx scenario-browser` with `node src/cli.ts` (Node 23.6+ runs the TypeScript directly). A terminal demo script is in `scripts/demo.sh`; the heal benchmark is in `docs/HEAL-BENCH.md` (`npm run bench:heal`).
 
 ## Scenarios
 

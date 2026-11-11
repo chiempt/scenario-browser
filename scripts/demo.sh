@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CLI="node src/cli.ts"
-DIR="$(mktemp -d)/my-tests"
+DIR="/tmp/my-tests"; rm -rf "$DIR"
 delay() { [ "${DEMO_FAST:-}" = 1 ] || sleep "$1"; }
 type_cmd() {
   printf '\n$ '
