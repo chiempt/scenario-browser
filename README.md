@@ -206,6 +206,42 @@ scenario-browser run examples/httpbin-html.md --launcher ./my-launcher.mjs --hea
 
 The same acceptable-use rule applies to any launcher.
 
+## Use as an MCP server
+
+`scenario-browser-mcp` is a small stdio [MCP](https://modelcontextprotocol.io) server. It has three tools:
+
+| Tool | What it does |
+|---|---|
+| `validate` | Check scenario text (JSON or Markdown). No browser. Returns `ok` or the errors. |
+| `run` | Run a scenario (text, or a file path) headless and return the per-step report. Takes `vars`, `timeoutMs` (default 120000, max 600000) and `allowScript`. |
+| `get_schema` | Return the scenario JSON Schema. |
+
+Paths given to `run` must stay inside the server's working directory. JavaScript steps (`evaluate`, `script`, `expect` with `js`, `if` with `js`, including ones reached through `include`) are refused unless `allowScript` is `true`; it is off by default.
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "scenario-browser": {
+      "command": "npx",
+      "args": ["-y", "-p", "scenario-browser", "scenario-browser-mcp"],
+      "cwd": "/path/to/your/scenarios"
+    }
+  }
+}
+```
+
+Claude Code:
+
+```sh
+claude mcp add scenario-browser -- npx -y -p scenario-browser scenario-browser-mcp
+```
+
+Browsers come from Playwright: run `npx playwright install chromium` once.
+
+> **Safety.** A scenario is code. With `allowScript` on, it runs in Node with your user's rights and no sandbox, and even without it a scenario can open any URL your machine can reach. Only run scenarios you wrote or reviewed, and keep the server's working directory limited to the scenarios you mean to expose.
+
 ## Portal
 
 ```bash
