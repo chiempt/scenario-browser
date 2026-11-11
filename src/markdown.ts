@@ -1,3 +1,4 @@
+import { KIND_PREFIX } from './selector.ts';
 import type { Scenario, Step } from './schema.ts';
 
 /**
@@ -21,6 +22,13 @@ import type { Scenario, Step } from './schema.ts';
  *   - extract h1 as heading
  *   - screenshot out.png
  *
+ * Selector prefixes work unquoted: xpath=//a[@id='x'], css=.card, role=button,
+ * testid=go, label=Email, placeholder=Search. If a selector has spaces, quote it
+ * ("role=button[name=\"Sign in\"]"); a quoted token that starts with a prefix
+ * is used as is. `ai="the Sign in button"` asks the AI to find the element;
+ * `--lock` rewrites it to the found selector plus a trailing
+ * <!-- ai="the Sign in button" --> comment that keeps your words.
+ *
  * `set name = value` bullets define {{name}} variables.
  *
  *   tags: smoke, login          (a line before the steps)
@@ -39,7 +47,15 @@ const tokenize = (line: string): { text: string; quoted: boolean }[] => {
   let i = 0;
   while (i < line.length) {
     if (/\s/.test(line[i]!)) { i++; continue; }
-    if (line[i] === '"') {
+    if (line.startsWith('ai="', i)) {
+      let j = i + 4, buf = '';
+      while (j < line.length && line[j] !== '"') {
+        if (line[j] === '\\' && j + 1 < line.length) { buf += line[j + 1]; j += 2; } else buf += line[j++];
+      }
+      if (j >= line.length) throw new MarkdownError(`unterminated quote in: ${line}`);
+      out.push({ text: `ai=${buf}`, quoted: false });
+      i = j + 1;
+    } else if (line[i] === '"') {
       let j = i + 1, buf = '';
       while (j < line.length && line[j] !== '"') {
         if (line[j] === '\\' && j + 1 < line.length) { buf += line[j + 1]; j += 2; } else buf += line[j++];
@@ -59,7 +75,7 @@ const tokenize = (line: string): { text: string; quoted: boolean }[] => {
 
 const sel = (t: { text: string; quoted: boolean } | undefined, line: string): string => {
   if (!t) throw new MarkdownError(`missing selector in: ${line}`);
-  return t.quoted ? `text=${t.text}` : t.text;
+  return t.quoted && !KIND_PREFIX.test(t.text) ? `text=${t.text}` : t.text;
 };
 const val = (t: { text: string } | undefined, line: string): string => {
   if (!t) throw new MarkdownError(`missing value in: ${line}`);
@@ -137,10 +153,13 @@ export const parseMarkdown = (source: string): Scenario => {
     if (tg && !steps.length) { tags = tg[1]!.split(',').map((x) => x.trim()).filter(Boolean); continue; }
     const b = /^[-*]\s+(.+)$/.exec(line);
     if (b) {
-      const body = b[1]!.trim();
+      let body = b[1]!.trim();
+      let aiNote: string | undefined;
+      const c = /\s*<!--\s*ai="((?:[^"\\]|\\.)*)"\s*-->$/.exec(body);
+      if (c) { aiNote = c[1]!.replace(/\\(.)/g, '$1'); body = body.slice(0, c.index).trim(); }
       const set = /^set\s+([A-Za-z_]\w*)\s*=\s*(.*)$/.exec(body);
       if (set) vars[set[1]!] = set[2]!.replace(/^"(.*)"$/, '$1');
-      else steps.push(parseStep(body));
+      else steps.push(aiNote ? { ...parseStep(body), ai: aiNote } : parseStep(body));
     } else if (!line.startsWith('#')) desc.push(line);
   }
   if (!name) throw new MarkdownError('missing "# Title" line');

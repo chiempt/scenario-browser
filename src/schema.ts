@@ -5,13 +5,14 @@ import { z } from 'zod';
  * types, and (via `scenario-browser schema`) the JSON Schema for editors.
  * Every object is strict so a misspelt key is an error, not a silent default.
  *
- * Selectors are strings: CSS, XPath, any Playwright selector (`text=Login`),
- * or `label=Email` (matched with getByLabel).
+ * Selectors are strings: CSS, XPath, `xpath=//...`, `css=...`, `text=Login`,
+ * `role=button[name="Sign in"]`, `testid=id`, `label=Email`, `placeholder=...`,
+ * or `ai=description` (an AI finds the element; see docs/ai-context.md).
  *
  * NOTE: `evaluate`, `script` and `expect js` run JavaScript. A scenario is code.
  */
 const selector = z.string().min(1).meta({
-  description: 'CSS, XPath, Playwright selector (text=Login), or label=Field label.',
+  description: 'CSS, XPath (//...), xpath=, css=, text=, role=button[name="X"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result).',
 });
 const url = z
   .string()
@@ -22,6 +23,7 @@ const common = {
   note: z.string().optional().meta({ description: 'Free-form comment shown in the log.' }),
   continueOnError: z.boolean().optional().meta({ description: 'If this step fails, record it as ignored and carry on.' }),
   retry: z.int().min(0).max(5).optional().meta({ description: 'Extra attempts for a failing step (leaf steps).' }),
+  ai: z.string().min(1).optional().meta({ description: 'What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.' }),
 };
 
 const code = z.string().min(1).meta({ description: 'JavaScript source.' });
@@ -31,7 +33,7 @@ export const ConditionSchema = z.union([
   z.strictObject({ visible: selector }),
 ]);
 
-type Common = { note?: string; continueOnError?: boolean; retry?: number };
+type Common = { note?: string; continueOnError?: boolean; retry?: number; ai?: string };
 export type Condition = { js: string } | { visible: string };
 type Name = string;
 /** Hand-written because the format is recursive (if/repeat/forEach hold steps). */
@@ -127,6 +129,7 @@ export const ScenarioSchema = z.strictObject({
   $schema: z.string().optional(),
   name: z.string().min(1),
   description: z.string().optional(),
+  context: z.string().max(8000).optional().meta({ description: 'Context for ai= selectors: what the page is, terms, conventions. Added after the project context.' }),
   tags: z.array(z.string().min(1)).optional().meta({ description: 'Labels for `project run --tag`.' }),
   baseUrl: baseUrl.optional().meta({ description: 'Joined to /path URLs. Overrides the project baseUrl.' }),
   headless: z.boolean().optional().meta({ description: 'Default true.' }),
@@ -140,6 +143,7 @@ export const ProjectSchema = z.strictObject({
   $schema: z.string().optional(),
   name: z.string().min(1),
   baseUrl: baseUrl.optional(),
+  context: z.string().max(8000).optional().meta({ description: 'Project context for ai= selectors: what the app is, terms, conventions. A context.md next to this file is read too.' }),
   vars: z.record(z.string(), z.json()).optional(),
   envFile: z.string().optional().meta({ description: 'Dotenv file read for {{env.X}}. Default ".env". Real environment variables win.' }),
   defaults: z
@@ -172,4 +176,16 @@ export const hasJs = (steps: readonly Step[]): boolean =>
       case 'repeat': case 'forEach': return hasJs(s.steps);
       default: return false;
     }
+  });
+
+const selectorOf = (s: Step): string | undefined => ('selector' in s && typeof s.selector === 'string' ? s.selector : undefined);
+
+/** Descriptions of ai= selectors that are not locked yet (anywhere in the tree, includes not followed). */
+export const unlockedAi = (steps: readonly Step[]): string[] =>
+  steps.flatMap((s): string[] => {
+    const own = selectorOf(s);
+    const here = own && /^ai=/i.test(own) ? [own.slice(3).trim()] : [];
+    if (s.action === 'if') return [...here, ...unlockedAi(s.then), ...(s.else ? unlockedAi(s.else) : [])];
+    if (s.action === 'repeat' || s.action === 'forEach') return [...here, ...unlockedAi(s.steps)];
+    return here;
   });

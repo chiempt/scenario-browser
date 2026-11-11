@@ -58,7 +58,7 @@ const formatFor = (source: string): '.json' | '.md' => (source.trimStart().start
 
 export const createServer = (options: McpOptions = {}): McpServer => {
   const root = path.resolve(options.workDir ?? process.cwd());
-  const server = new McpServer({ name: 'scenario-browser', version: '0.1.0' });
+  const server = new McpServer({ name: 'scenario-browser', version: '0.2.0' });
 
   server.registerTool('validate', {
     description: 'Check a scenario (JSON or Markdown text) against the schema. Does not open a browser or run anything.',

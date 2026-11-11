@@ -1,6 +1,6 @@
 {
   "name": "scenario-browser",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Run browser automation from small JSON or Markdown scenarios, with optional AI to write them and repair broken selectors.",
   "license": "MIT",
   "type": "module",

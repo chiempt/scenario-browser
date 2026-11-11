@@ -2,7 +2,7 @@ import type { Page } from 'playwright';
 
 export interface DomItem {
   tag: string; id?: string; name?: string; type?: string; role?: string; text?: string;
-  placeholder?: string; ariaLabel?: string; testId?: string; href?: string; css: string;
+  placeholder?: string; ariaLabel?: string; labelText?: string; testId?: string; href?: string; css: string;
 }
 
 /**
@@ -30,6 +30,7 @@ export const reducedDom = async (page: Page, max = 80): Promise<DomItem[]> =>
     for (const el of Array.from(document.querySelectorAll(sel))) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;
+      if (el.tagName === 'INPUT' && (el as HTMLInputElement).type === 'hidden') continue;
       const g = (a: string) => el.getAttribute(a) ?? undefined;
       const item: DomItem = { tag: el.tagName.toLowerCase(), css: cssOf(el) };
       const text = (el.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
@@ -37,11 +38,14 @@ export const reducedDom = async (page: Page, max = 80): Promise<DomItem[]> =>
       if (g('name')) item.name = g('name')!;
       if (g('type')) item.type = g('type')!;
       if (g('role')) item.role = g('role')!;
-      if (text && el.tagName !== 'INPUT') item.text = text;
+      // Never read text of form controls: a textarea's textContent is its value, a select lists options.
+      if (text && !['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) item.text = text;
+      const lbl = (el as HTMLInputElement).labels?.[0]?.textContent?.trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (lbl) item.labelText = lbl;
       if (g('placeholder')) item.placeholder = g('placeholder')!;
       if (g('aria-label')) item.ariaLabel = g('aria-label')!;
       if (g('data-testid')) item.testId = g('data-testid')!;
-      if (el.tagName === 'A' && g('href')) item.href = g('href')!.slice(0, 80);
+      if (el.tagName === 'A' && g('href')) item.href = g('href')!.split(/[?#]/)[0]!.slice(0, 80);
       out.push(item);
       if (out.length >= limit) break;
     }

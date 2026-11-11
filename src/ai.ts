@@ -84,3 +84,24 @@ export const suggestSelector = async (
     ? { selector: data.selector, reason: data.reason ?? '' }
     : null;
 };
+
+const LOCATE_SYSTEM = `You find ONE element on a web page for browser automation.
+You get: the project context (what the app is, terms, conventions), the page URL and title, what to find, and a reduced list of the page's interactive elements (no field values).
+Reply with JSON only: {"selector": "<locator>", "reason": "<short>"}.
+The locator must use one of these forms: xpath=//..., css=..., text=..., role=button[name="..."], testid=..., label=..., placeholder=...
+Prefer, in order: testid, role with name, label, an id (css=#id), text, then the css value from the list. Prefer a locator that matches exactly one element.
+Use only what is in the list; never invent ids or text. If nothing fits reply {"selector": null, "reason": "..."}.`;
+
+export interface LocateInput { description: string; dom: DomItem[]; context?: string; url?: string; title?: string }
+
+export const locateElement = async (input: LocateInput, opts: AiOptions = {}): Promise<HealSuggestion | null> => {
+  const reply = await complete(
+    LOCATE_SYSTEM,
+    `Project context:\n${input.context?.trim() || '(none)'}\n\nPage: ${input.url ?? ''} | ${input.title ?? ''}\nFind: ${input.description}\nElements: ${JSON.stringify(input.dom)}`,
+    opts,
+  );
+  const data = JSON.parse(extractJson(reply)) as { selector?: string | null; reason?: string };
+  return typeof data.selector === 'string' && data.selector.trim()
+    ? { selector: data.selector.trim(), reason: data.reason ?? '' }
+    : null;
+};

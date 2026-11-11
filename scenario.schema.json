@@ -12,6 +12,11 @@
     "description": {
       "type": "string"
     },
+    "context": {
+      "description": "Context for ai= selectors: what the page is, terms, conventions. Added after the project context.",
+      "type": "string",
+      "maxLength": 8000
+    },
     "tags": {
       "description": "Labels for `project run --tag`.",
       "type": "array",
@@ -116,6 +121,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -134,7 +144,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "note": {
               "description": "Free-form comment shown in the log.",
@@ -149,6 +159,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -167,7 +182,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "value": {
               "type": "string"
@@ -185,6 +200,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -208,7 +228,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "note": {
               "description": "Free-form comment shown in the log.",
@@ -223,6 +243,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -241,7 +266,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "value": {
               "type": "string"
@@ -259,6 +284,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -278,7 +308,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "note": {
               "description": "Free-form comment shown in the log.",
@@ -293,6 +323,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -326,6 +361,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -344,7 +384,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "note": {
               "description": "Free-form comment shown in the log.",
@@ -359,6 +399,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -392,7 +437,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "note": {
               "description": "Free-form comment shown in the log.",
@@ -407,6 +452,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -425,7 +475,7 @@
             "selector": {
               "type": "string",
               "minLength": 1,
-              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
             },
             "as": {
               "type": "string",
@@ -444,6 +494,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -477,6 +532,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -515,6 +575,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -553,6 +618,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -595,6 +665,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -632,7 +707,7 @@
                     "visible": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+                      "description": "CSS, XPath (//...), xpath=, css=, text=, role=button[name=\"X\"], testid=, label=, placeholder=, or ai=<describe the element> (AI resolves it; --lock saves the result)."
                     }
                   },
                   "required": [
@@ -668,6 +743,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -714,6 +794,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -770,6 +855,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 5
+            },
+            "ai": {
+              "description": "What the selector is meant to find, in words. Written by --lock next to the selector it found; also read by `explain`.",
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [

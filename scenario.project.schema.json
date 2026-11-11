@@ -13,6 +13,11 @@
       "type": "string",
       "pattern": "^https?:\\/\\/"
     },
+    "context": {
+      "description": "Project context for ai= selectors: what the app is, terms, conventions. A context.md next to this file is read too.",
+      "type": "string",
+      "maxLength": 8000
+    },
     "vars": {
       "type": "object",
       "propertyNames": {

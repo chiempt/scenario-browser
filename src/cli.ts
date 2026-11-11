@@ -2,6 +2,9 @@
 import { glob, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { generateScenario } from './ai.ts';
+import { explainScenario } from './explain.ts';
+import { applyLock } from './lock.ts';
+import { startPicker } from './picker.ts';
 import { loadScenario, missingReferences } from './load.ts';
 import { PROJECT_FILE, ProjectError, initProject, listProject, loadProject, runProject } from './project.ts';
 import { runScenario } from './runner.ts';
@@ -10,11 +13,13 @@ import { startPortal } from './server.ts';
 
 const USAGE = `scenario-browser <command>
 
-  run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]]
+  run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]] [--lock] [--no-ai]
+  explain <file>                              print a scenario as plain sentences
+  pick <url>                                  open the page, click an element, get XPath/CSS/text/role suggestions
   validate <file|dir>...                      check scenarios/projects without a browser
   project init [dir]                          create scenario.project.json + samples
   project list [--dir d]                      scenarios and tags in a project
-  project run [--dir d] [--tag t]... [--grep text] [--headed] [--heal] [--var k=v] [--report-dir d]
+  project run [--dir d] [--tag t]... [--grep text] [--headed] [--heal] [--lock] [--no-ai] [--var k=v] [--report-dir d]
   generate "description" [-o file.json]       (experimental) AI writes a scenario; needs ANTHROPIC_API_KEY
   portal [--port 7070] [--project dir]        local web UI on 127.0.0.1
   schema [scenario|project]                   print a JSON Schema
@@ -81,14 +86,16 @@ const main = async (argv: string[]): Promise<number> => {
     }
     case 'run': {
       const headed = flag(args, '--headed'), heal = flag(args, '--heal'), save = flag(args, '--save-healed');
+      const lock = flag(args, '--lock'), noAi = flag(args, '--no-ai');
       const launcher = option(args, '--launcher');
       const vars = parseVars(multi(args, '--var'));
       const file = args[0];
       if (!file) { console.error(USAGE); return 2; }
       const report = await runScenario(await loadScenario(file), {
-        file, headless: headed ? false : undefined, heal, log: console.log, overrideVars: vars,
+        file, headless: headed ? false : undefined, heal, noAi, log: console.log, overrideVars: vars,
         rootDir: await projectRootFor(file), ...(launcher ? { launcher } : {}),
       });
+      if (lock) { const note = await applyLock(file, report); if (note) console.log(note); }
       if (report.healed && save) {
         if (!file.endsWith('.json')) console.error('--save-healed only writes .json scenarios; healed scenario not saved');
         else { await writeFile(file, JSON.stringify(report.healed, null, 2) + '\n'); console.log(`saved healed selectors to ${file}`); }
@@ -109,17 +116,32 @@ const main = async (argv: string[]): Promise<number> => {
         return 0;
       }
       if (sub === 'run') {
-        const headed = flag(rest, '--headed'), heal = flag(rest, '--heal');
+        const headed = flag(rest, '--headed'), heal = flag(rest, '--heal'), lock = flag(rest, '--lock'), noAi = flag(rest, '--no-ai');
         const tags = multi(rest, '--tag'), grep = option(rest, '--grep'), reportDir = option(rest, '--report-dir');
         const vars = parseVars(multi(rest, '--var'));
         const report = await runProject(lp, {
-          tags, ...(grep ? { grep } : {}), ...(headed ? { headless: false } : {}), heal, vars,
+          tags, ...(grep ? { grep } : {}), ...(headed ? { headless: false } : {}), heal, lock, noAi, vars,
           ...(reportDir ? { reportDir } : {}), log: console.log,
         });
         console.log(`\n${report.status.toUpperCase()}: ${report.counts.passed}/${report.counts.total} passed, ${report.counts.failed} failed${report.note ? ` (${report.note})` : ''}`);
         return report.status === 'passed' ? 0 : 1;
       }
       console.error(USAGE); return 2;
+    }
+    case 'explain': {
+      if (!args[0]) { console.error(USAGE); return 2; }
+      console.log(explainScenario(await loadScenario(args[0])));
+      return 0;
+    }
+    case 'pick': {
+      if (!args[0]) { console.error(USAGE); return 2; }
+      const session = await startPicker(args[0], {
+        onPick: (p) => console.log(`\n<${p.tag}>${p.text ? ` "${p.text}"` : ''}\n${p.candidates.map((c) => `  ${c.selector}${c.matches === undefined ? '' : `   (${c.matches} match${c.matches === 1 ? '' : 'es'})`}`).join('\n')}`),
+      });
+      console.log('Click elements in the browser window; suggestions print here. Close the window or press Ctrl+C to stop.');
+      await new Promise<void>((resolve) => { session.page.on('close', () => resolve()); process.once('SIGINT', () => resolve()); });
+      await session.close().catch(() => {});
+      return 0;
     }
     case 'generate': {
       const out = option(args, '-o');

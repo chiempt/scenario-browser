@@ -70,7 +70,19 @@ expect(vars.headings === 1, 'expected one h1');
 
 Steps: `goto`, `click`, `fill`, `press`, `select`, `check`, `wait`, `waitFor`, `expect` (`text`, `visible`, `url`, `title`, `js`), `extract`, `screenshot`, `evaluate`, `script`, `include`, `if`, `repeat`, `forEach`. Every step accepts `note`, `continueOnError` (record as ignored, carry on) and `retry` (extra attempts, leaf steps). `if`/`repeat`/`forEach`/`retry`/`continueOnError` are JSON-only; Markdown covers the linear steps, `include`, and `js` blocks.
 
-Selectors: CSS, XPath, `text=...`, or `label=Field label`. URLs: absolute `http(s)`, or `/path` joined to `baseUrl` (scenario or project). Unknown keys are errors.
+Selectors (details and the AI form in [docs/ai-context.md](docs/ai-context.md)):
+
+| Form | Example |
+|---|---|
+| CSS (default) | `#go`, `css=.card > a` |
+| XPath | `//button[@id="go"]`, `xpath=//a[1]` |
+| Visible text | `text=Login` (Markdown: `click "Login"`) |
+| Role + name | `role=button[name="Sign in"]` |
+| Test id | `testid=login-btn` |
+| Label / placeholder | `label=Email`, `placeholder=Search` |
+| AI target | `ai=the Sign in button in the top right` |
+
+In Markdown, quote a selector that has spaces: `click "role=button[name=\"Sign in\"]"`. URLs: absolute `http(s)`, or `/path` joined to `baseUrl` (scenario or project). Unknown keys are errors.
 
 ### Variables
 
@@ -154,12 +166,36 @@ jobs:
 
 | Command | What it does |
 |---|---|
-| `run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]]` | Run one scenario. Exit 0 pass, 1 fail. |
+| `run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]] [--lock] [--no-ai]` | Run one scenario. Exit 0 pass, 1 fail. `--lock` saves selectors the AI found; `--no-ai` forbids AI calls. |
+| `explain <file>` | Print a scenario as plain sentences. |
+| `pick <url>` | Open the page, click an element, print XPath / CSS / text / role suggestions. |
 | `validate <file\|dir>...` | Check scenarios and projects, including that `include`/`script file` targets exist. No browser. |
 | `project init\|list\|run` | See Projects. |
 | `portal [--port 7070] [--project dir]` | Local web UI. |
 | `generate "description" [-o file.json]` | Experimental. AI drafts a scenario. |
 | `schema [scenario\|project]` | Print a JSON Schema. |
+
+## AI context (v0.2)
+
+Give the AI your project's context and let it find selectors, or pick them yourself. Full guide with a `context.md` example: [docs/ai-context.md](docs/ai-context.md).
+
+```bash
+echo '"Giỏ hàng" is the cart icon in the header.' > context.md      # next to scenario.project.json
+```
+```markdown
+- click ai="the cart icon"
+```
+```bash
+export ANTHROPIC_API_KEY=...
+scenario-browser run cart.md --lock       # AI finds it once, the selector is written into cart.md
+scenario-browser run cart.md --no-ai      # from now on: locked selectors only, no AI, no key
+scenario-browser explain cart.md          # read it back in plain sentences
+scenario-browser pick https://your-site.example   # or click-to-copy locators yourself (also in the portal)
+```
+
+The model gets your context, the URL (no query), the title, your description and a reduced element list. Never input values, hidden inputs, cookies or screenshots. Without a key an `ai=` step stops the run with a clear error before the browser opens.
+
+Status: the AI path is tested against a mocked API and real Chromium, not yet against the live Anthropic API; treat found selectors as drafts and review them (that is what `--lock` leaves in the file).
 
 ## AI steps (experimental)
 
@@ -250,7 +286,7 @@ Browsers come from Playwright: run `npx playwright install chromium` once.
 scenario-browser portal --project my-tests      # http://127.0.0.1:7070
 ```
 
-One page: paste or edit a scenario (JSON or Markdown), Validate, Run, read the log, Generate with AI (experimental). With a project it also lists scenarios and tags, runs by tag/grep, and shows the HTML report. It binds to `127.0.0.1`, rejects non-local `Host` headers and cross-origin POSTs, and has no authentication: do not expose it to a network. A scenario containing JavaScript shows a warning and asks for confirmation before it runs.
+One page: paste or edit a scenario (JSON or Markdown), Validate, Run, read the log, Generate with AI (experimental). *Pick element* opens a page in a normal browser window; click an element to get XPath, CSS, text and role locators to copy or insert as a step. With a project it also lists scenarios and tags, runs by tag/grep, and shows the HTML report. It binds to `127.0.0.1`, rejects non-local `Host` headers and cross-origin POSTs, and has no authentication: do not expose it to a network. A scenario containing JavaScript shows a warning and asks for confirmation before it runs.
 
 ## Development
 

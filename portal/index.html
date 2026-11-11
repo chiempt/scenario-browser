@@ -47,6 +47,15 @@
     <button id="validate" class="alt">Validate</button>
     <button id="run">Run</button>
   </div>
+  <div id="pickpanel" class="row" style="display:block;border:1px solid var(--bd);border-radius:6px;padding:10px">
+    <b>Pick element</b> <span class="sub">Opens the page in a normal browser window. Click an element there to get locators. Nothing you type in the page is read.</span>
+    <div class="row">
+      <input type="text" id="pickurl" placeholder="https://your-site.example/page">
+      <button id="pickstart" class="alt">Open page</button>
+      <button id="pickstop" class="alt">Close</button>
+    </div>
+    <div id="pickres" class="sub"></div>
+  </div>
   <div class="row">
     <input type="text" id="desc" placeholder="Describe a scenario for AI to write, e.g. open example.com and check the heading">
     <button id="gen" class="alt">Generate</button>
@@ -104,6 +113,42 @@ $("runproj").onclick = async () => {
   }
   busy(false);
 };
+let pickTimer, lastAt = "";
+const stepFor = (sel) => ({ action: "click", selector: sel });
+const insertStep = (sel) => {
+  const fmt = $("format").value;
+  if (fmt === "md") {
+    const t = $("text"); t.value = t.value.replace(/\s*$/, "\n") + "- click " + (/\s/.test(sel) ? JSON.stringify(sel) : sel) + "\n";
+  } else {
+    try { const o = JSON.parse($("text").value); o.steps = [...(o.steps || []), stepFor(sel)]; $("text").value = JSON.stringify(o, null, 2); }
+    catch { out("Fix the JSON first, then insert.", "bad"); }
+  }
+};
+const renderPick = (p) => {
+  const box = $("pickres"); box.textContent = "";
+  const head = document.createElement("div"); head.textContent = "<" + p.tag + ">" + (p.text ? ' "' + p.text + '"' : ""); box.appendChild(head);
+  for (const c of p.candidates) {
+    const row = document.createElement("div"); row.className = "row";
+    const code = document.createElement("code"); code.textContent = c.selector + (c.matches === undefined ? "" : "   (" + c.matches + " match" + (c.matches === 1 ? "" : "es") + ")");
+    const copy = document.createElement("button"); copy.className = "alt"; copy.textContent = "Copy";
+    copy.onclick = () => navigator.clipboard.writeText(c.selector);
+    const ins = document.createElement("button"); ins.className = "alt"; ins.textContent = "Insert as click";
+    ins.onclick = () => insertStep(c.selector);
+    row.append(code, copy, ins); box.appendChild(row);
+  }
+};
+const pollPick = async () => {
+  const r = await (await fetch("/api/pick/last")).json();
+  if (!r.active) { clearInterval(pickTimer); pickTimer = null; return; }
+  if (r.pick && r.pick.at !== lastAt) { lastAt = r.pick.at; renderPick(r.pick); }
+};
+$("pickstart").onclick = async () => {
+  const r = await post("/api/pick/start", { url: $("pickurl").value });
+  if (!r.ok) return out(r.error, "bad");
+  out("Picker open. Click an element in the browser window.", "ok");
+  lastAt = ""; if (!pickTimer) pickTimer = setInterval(pollPick, 700);
+};
+$("pickstop").onclick = async () => { await post("/api/pick/stop", {}); out("Picker closed."); };
 $("gen").onclick = async () => {
   busy(true); out("Asking the model...");
   const r = await post("/api/generate", { description: $("desc").value });

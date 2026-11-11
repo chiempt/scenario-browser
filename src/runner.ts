@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { BrowserContext, Locator, Page } from 'playwright';
-import { suggestSelector, type AiOptions } from './ai.ts';
+import { AiError, locateElement, suggestSelector, type AiOptions } from './ai.ts';
+import { loadContext } from './context.ts';
 import { reducedDom } from './dom.ts';
 import { openSession } from './launch.ts';
 import { loadScenario } from './load.ts';
-import type { Scenario, Step } from './schema.ts';
+import { unlockedAi, type Scenario, type Step } from './schema.ts';
+import { isAiSelector, toLocator } from './selector.ts';
 import { interpolate, type Vars } from './template.ts';
 
 export type StepStatus = 'passed' | 'failed' | 'healed' | 'ignored';
@@ -26,11 +28,19 @@ export interface RunReport {
   error?: string;
   /** Scenario with healed selectors applied; only present if something healed. */
   healed?: Scenario;
+  /** Scenario with ai= selectors replaced by what the AI found (for --lock); only present if the AI resolved something. */
+  locked?: Scenario;
+  /** Each AI resolution, in order. */
+  picks?: { ai: string; selector: string; reason: string }[];
 }
 export interface RunOptions {
   headless?: boolean;
   /** Ask the AI for a replacement selector when a step fails on one. */
   heal?: boolean;
+  /** Forbid every AI call: ai= steps must already have a locked selector. */
+  noAi?: boolean;
+  /** Extra context for ai= selectors (the project's context.md and context field are read from rootDir anyway). */
+  context?: string;
   ai?: AiOptions;
   /** Module path/package exporting a function that returns a BrowserContext or Page. */
   launcher?: string;
@@ -58,8 +68,7 @@ const SCRIPT_TIMEOUT = 60_000;
 const MAX_INCLUDE_DEPTH = 8;
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...a: string[]) => (...args: unknown[]) => Promise<unknown>;
 
-const locate = (page: Page, selector: string): Locator =>
-  selector.startsWith('label=') ? page.getByLabel(selector.slice(6)) : page.locator(selector);
+const locate = (page: Page, selector: string): Locator => toLocator(page, selector);
 
 const describe = (s: Step): string => {
   const { action, note: _n, continueOnError: _c, retry: _r, ...rest } = s as Step & Record<string, unknown>;
@@ -92,7 +101,7 @@ const resolveInside = (ctx: Ctx, file: string): string => {
 interface Ctx {
   page: Page; context: BrowserContext; vars: Vars; env: Record<string, string | undefined>;
   baseUrl?: string; baseDir?: string; rootDir?: string; timeout: number; outDir: string;
-  log: (l: string) => void; heal: boolean; ai?: AiOptions;
+  log: (l: string) => void; heal: boolean; noAi: boolean; aiContext: string; picks: { ai: string; selector: string; reason: string }[]; lockedRoot: boolean; ai?: AiOptions;
   records: StepRecord[]; slug: string; includeStack: string[]; healedRoot: boolean; fileDepth: number;
 }
 
@@ -183,6 +192,27 @@ const executeLeaf = async (ctx: Ctx, step: Step): Promise<void> => {
   }
 };
 
+/** Turns an ai= selector into a real one using the live page, the project context and the AI. */
+const resolveAi = async (ctx: Ctx, step: Step & { selector: string }, pad: string, p: string): Promise<Step> => {
+  if (!isAiSelector(step.selector)) return step;
+  const raw = step.selector.slice(3).trim();
+  const dynamic = raw.includes('{{');
+  const description = interpolate(raw, ctx.vars, ctx.env);
+  if (ctx.noAi) throw new Error(`step ${p} has ai="${description}" but no locked selector and --no-ai is set; run once with --lock`);
+  ctx.log(`${pad}step ${p}: asking the model to find "${description}"`);
+  const sug = await locateElement({
+    description, dom: await reducedDom(ctx.page, 150), context: ctx.aiContext, url: ctx.page.url().split(/[?#]/)[0]!, title: await ctx.page.title(),
+  }, ctx.ai);
+  if (!sug) throw new Error(`the model could not find an element for "${description}"`);
+  if (isAiSelector(sug.selector)) throw new Error(`the model returned an unusable selector for "${description}"`);
+  if ((await locate(ctx.page, sug.selector).count()) === 0) throw new Error(`the model's selector ${JSON.stringify(sug.selector)} matches nothing on the page ("${description}")`);
+  ctx.picks.push({ ai: description, selector: sug.selector, reason: sug.reason });
+  ctx.log(`${pad}found: ${JSON.stringify(sug.selector)} (${sug.reason})`);
+  const fixed = { ...step, selector: sug.selector, ai: description } as Step;
+  if (!dynamic) { Object.assign(step, { selector: sug.selector, ai: description }); if (ctx.fileDepth === 0) ctx.lockedRoot = true; }
+  return fixed;
+};
+
 const runChildren = async (ctx: Ctx, steps: readonly Step[], prefix: string, depth: number): Promise<void> => {
   for (let i = 0; i < steps.length; i++) await runStep(ctx, steps[i]!, `${prefix}${i + 1}`, depth);
 };
@@ -240,12 +270,13 @@ const runStep = async (ctx: Ctx, step: Step, p: string, depth: number): Promise<
       await runContainer(ctx, step, p, depth);
     } else {
       const attempts = (step.retry ?? 0) + 1;
+      const exec = hasSelector(step) ? await resolveAi(ctx, step, pad, p) : step;
       for (let a = 1; ; a++) {
         try {
           try {
-            await executeLeaf(ctx, step);
+            await executeLeaf(ctx, exec);
           } catch (err) {
-            if (!ctx.heal || !hasSelector(step)) throw err;
+            if (!ctx.heal || ctx.noAi || !hasSelector(step)) throw err;
             ctx.log(`${pad}step ${p} failed on selector, asking the model to repair it`);
             const old = step.selector!;
             const sug = await suggestSelector(step, (err as Error).message, await reducedDom(ctx.page), ctx.ai);
@@ -298,6 +329,16 @@ export const runScenario = async (scenario: Scenario, opts: RunOptions = {}): Pr
   const rootDir = opts.rootDir ?? baseDir;
   const headless = opts.headless ?? scenario.headless ?? opts.defaults?.headless ?? true;
 
+  // Fail before a browser opens if the scenario needs AI and cannot have it.
+  const pending = unlockedAi(working);
+  if (pending.length) {
+    if (opts.noAi) throw new AiError(`--no-ai is set but ${pending.length} step(s) still use ai= without a locked selector (${pending.map((d) => `"${d}"`).join(', ')}). Run once with --lock.`);
+    if (!(opts.ai?.apiKey ?? process.env.ANTHROPIC_API_KEY)) throw new AiError(`${pending.length} step(s) use ai= selectors but ANTHROPIC_API_KEY is not set. Export it, or lock the selectors earlier with --lock.`);
+  }
+  const aiContext = pending.length
+    ? [await loadContext(opts.rootDir ?? baseDir), opts.context ?? '', scenario.context ?? ''].filter((x) => x.trim()).join('\n\n')
+    : '';
+
   const session = await openSession(headless, opts.launcher);
   const ctx: Ctx = {
     page: session.page, context: session.page.context(), vars, env: opts.env ?? process.env,
@@ -305,7 +346,7 @@ export const runScenario = async (scenario: Scenario, opts: RunOptions = {}): Pr
     ...(baseDir ? { baseDir } : {}), ...(rootDir ? { rootDir } : {}),
     timeout: scenario.timeout ?? opts.defaults?.timeout ?? 10_000,
     outDir: opts.outDir ?? path.join('runs', startedAt.replace(/[:.]/g, '-')),
-    log, heal: opts.heal === true, ...(opts.ai ? { ai: opts.ai } : {}),
+    log, heal: opts.heal === true, noAi: opts.noAi === true, aiContext: '', picks: [], lockedRoot: false, ...(opts.ai ? { ai: opts.ai } : {}),
     records: [], slug: slug(scenario.name), includeStack: opts.file ? [path.resolve(opts.file)] : [], healedRoot: false, fileDepth: 0,
   };
 
@@ -317,9 +358,12 @@ export const runScenario = async (scenario: Scenario, opts: RunOptions = {}): Pr
       status: error ? 'failed' : 'passed', startedAt, durationMs: Date.now() - started,
       steps: ctx.records, vars: changed, ...(error ? { error } : {}),
       ...(ctx.healedRoot ? { healed: { ...scenario, steps: working } } : {}),
+      ...(ctx.lockedRoot ? { locked: { ...scenario, steps: working } } : {}),
+      ...(ctx.picks.length ? { picks: ctx.picks } : {}),
     };
   };
 
+  ctx.aiContext = aiContext;
   try {
     log(`run "${scenario.name}" (${working.length} steps)`);
     try {

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateScenario } from './ai.ts';
 import { parseScenarioText } from './load.ts';
+import { startPicker, type PickerSession } from './picker.ts';
 import { listProject, runProject, type LoadedProject } from './project.ts';
 import { runScenario } from './runner.ts';
 import { hasJs } from './schema.ts';
@@ -30,6 +31,8 @@ const readBody = (req: IncomingMessage): Promise<string> =>
 export const startPortal = (port: number, host = '127.0.0.1', project?: LoadedProject): Promise<Server> =>
   new Promise((resolve, reject) => {
     let busy = false;
+    let picker: PickerSession | undefined;
+    const stopPicker = async () => { const p = picker; picker = undefined; await p?.close().catch(() => {}); };
     const server = createServer(async (req, res) => {
       const send = (code: number, body: unknown, type = 'application/json') => {
         res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
@@ -42,6 +45,9 @@ export const startPortal = (port: number, host = '127.0.0.1', project?: LoadedPr
 
         if (req.method === 'GET') {
           if (url.pathname === '/') return send(200, await readFile(PAGE, 'utf8'), 'text/html; charset=utf-8');
+          if (url.pathname === '/api/pick/last') {
+            return send(200, { active: Boolean(picker), count: picker?.picks.length ?? 0, pick: picker?.last() ?? null });
+          }
           if (url.pathname === '/api/project') {
             if (!project) return send(200, { project: null });
             return send(200, { project: { name: project.project.name, scenarios: await listProject(project) } });
@@ -61,7 +67,7 @@ export const startPortal = (port: number, host = '127.0.0.1', project?: LoadedPr
         if (origin && new URL(origin).host !== hostHeader) return send(403, { error: 'cross-origin request refused' });
 
         const body = JSON.parse((await readBody(req)) || '{}') as {
-          text?: string; format?: string; description?: string; heal?: boolean; confirmJs?: boolean; tags?: string[]; grep?: string;
+          text?: string; format?: string; description?: string; heal?: boolean; confirmJs?: boolean; tags?: string[]; grep?: string; url?: string;
         };
         const ext = body.format === 'md' ? '.md' : '.json';
         if (req.url === '/api/validate') {
@@ -96,6 +102,13 @@ export const startPortal = (port: number, host = '127.0.0.1', project?: LoadedPr
             return send(200, { ok: report.status === 'passed', counts: report.counts, status: report.status, note: report.note, log });
           } finally { busy = false; }
         }
+        if (req.url === '/api/pick/start') {
+          await stopPicker();
+          picker = await startPicker(body.url ?? '', { headless: false });
+          picker.page.on('close', () => { picker = undefined; });
+          return send(200, { ok: true });
+        }
+        if (req.url === '/api/pick/stop') { await stopPicker(); return send(200, { ok: true }); }
         if (req.url === '/api/generate') {
           if (!body.description) return send(400, { error: 'description required' });
           return send(200, { ok: true, scenario: await generateScenario(body.description) });
@@ -105,6 +118,7 @@ export const startPortal = (port: number, host = '127.0.0.1', project?: LoadedPr
         return send(400, { ok: false, error: (e as Error).message });
       }
     });
+    server.on('close', () => { void stopPicker(); });
     server.once('error', reject);
     server.listen(port, host, () => resolve(server));
   });

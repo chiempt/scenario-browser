@@ -2,6 +2,7 @@ import { glob, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AiOptions } from './ai.ts';
 import { loadScenario } from './load.ts';
+import { applyLock } from './lock.ts';
 import { prepareReportDir, writeReport, type ProjectReport } from './report.ts';
 import { runScenario, type RunReport } from './runner.ts';
 import { ProjectSchema, formatIssues, hasJs, type Project, type Scenario } from './schema.ts';
@@ -80,6 +81,10 @@ export const listProject = async (lp: LoadedProject) =>
 
 export interface ProjectRunOptions {
   tags?: string[]; grep?: string; headless?: boolean; heal?: boolean;
+  /** Forbid AI calls; ai= steps must be locked already. */
+  noAi?: boolean;
+  /** Write selectors the AI found back into the scenario files. */
+  lock?: boolean;
   /** --var overrides. */
   vars?: Record<string, string>;
   reportDir?: string; ai?: AiOptions; log?: (l: string) => void;
@@ -106,15 +111,20 @@ export const runProject = async (lp: LoadedProject, opts: ProjectRunOptions = {}
       scenarios.push({ ...r, phase }); return r;
     }
     log(`[${phase}] ${rel}`);
-    const r = await runScenario(scenario, {
+    let r: RunReport;
+    try { r = await runScenario(scenario, {
       file, rootDir: lp.dir, outDir, env, log,
       ...(lp.project.baseUrl ? { baseUrl: lp.project.baseUrl } : {}),
       baseVars: { ...(lp.project.vars ?? {}), ...dynamic },
       ...(opts.vars ? { overrideVars: opts.vars } : {}),
       defaults: { ...(d.timeout ? { timeout: d.timeout } : {}), ...(d.headless === undefined ? {} : { headless: d.headless }) },
       ...(opts.headless === undefined ? {} : { headless: opts.headless }),
-      ...(opts.heal ? { heal: true } : {}), ...(opts.ai ? { ai: opts.ai } : {}), ...(launcher ? { launcher } : {}),
-    });
+      ...(opts.heal ? { heal: true } : {}), ...(opts.noAi ? { noAi: true } : {}),
+      ...(opts.ai ? { ai: opts.ai } : {}), ...(launcher ? { launcher } : {}),
+    }); } catch (e) {
+      r = { scenario: scenario.name, file: rel, tags: scenario.tags ?? [], status: 'failed', startedAt: new Date().toISOString(), durationMs: 0, steps: [], vars: {}, error: (e as Error).message };
+    }
+    if (opts.lock) { const note = await applyLock(file, r); if (note) log(note); }
     scenarios.push({ ...r, file: rel, phase });
     return r;
   };
