@@ -1,29 +1,39 @@
 # scenario-browser
 
-Run browser automation from small **scenario files** (JSON or Markdown), with optional AI to **write** scenarios from a description and to **repair broken selectors** when a page changes. Plain Playwright + Chromium underneath. TypeScript, runs directly on Node 23.6+.
+[![CI](https://github.com/chiempt/scenario-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/chiempt/scenario-browser/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Browser tests and automations as small **scenario files** (JSON or Markdown), organised in **projects**, with optional JavaScript where you need it. Plain Playwright + Chromium underneath. Experimental AI can draft scenarios and repair broken selectors.
 
 > **Use it only on sites you own or are explicitly allowed to automate.**
-> scenario-browser does not solve captchas, evade bot detection, or spoof fingerprints, and will not accept contributions that do.
+> It does not solve captchas, evade bot detection, or spoof fingerprints, and will not accept contributions that do.
+
+## Why
+
+- **Readable by non-programmers.** A smoke test is five lines of Markdown, not a test framework setup.
+- **Strict and honest.** Unknown keys are errors, failures name the step, and every failed step gets a screenshot and an HTML report.
+- **Project-shaped.** Tags, shared variables, `.env`, setup/teardown and CI exit codes, so scenarios grow into a real suite.
+- **Code when you need it.** `evaluate` and `script` steps drop into JavaScript; the rest stays declarative.
+- **Small.** Two runtime dependencies (`playwright`, `zod`). No server, no account.
 
 ## Quickstart
 
 ```bash
-git clone <this repo> && cd scenario-browser
-npm install
-npm run browser:install        # downloads Chromium via Playwright
-
-node src/cli.ts validate examples
-node src/cli.ts run examples/httpbin-html.md
-node src/cli.ts run examples/example-heading.json --headed
+npm install scenario-browser && npx playwright install chromium   # or clone this repo: npm install && npm run browser:install
+npx scenario-browser project init my-tests
+npx scenario-browser project run --dir my-tests --tag smoke       # opens my-tests/reports/report.html afterwards
 ```
+
+In a clone, replace `npx scenario-browser` with `node src/cli.ts` (Node 23.6+ runs the TypeScript directly). A terminal demo script is in `scripts/demo.sh`.
 
 ## Scenarios
 
-JSON (a `scenario.schema.json` is included for editor autocomplete):
+JSON (`scenario.schema.json` is included for editor autocomplete):
 
 ```json
 {
   "name": "example.com page check",
+  "tags": ["smoke"],
   "steps": [
     { "action": "goto", "url": "https://example.com" },
     { "action": "expect", "kind": "title", "value": "Example Domain" },
@@ -34,46 +44,139 @@ JSON (a `scenario.schema.json` is included for editor autocomplete):
 
 Markdown, one step per line:
 
-```markdown
+````markdown
 # httpbin HTML page
+tags: smoke
+
 - goto https://httpbin.org/html
 - waitFor h1
 - expect text "Herman Melville"
 - fill #q "text"            # unquoted = CSS/XPath/Playwright selector
 - click "Login"             # quoted = visible text (text=Login)
 - extract h1 as title       # later usable as {{title}}
+- include ./login.md
+- expect js "document.title.length > 0"
+
+```js evaluate as headings
+return document.querySelectorAll('h1').length;
 ```
 
-Steps: `goto`, `click`, `fill`, `press`, `select`, `check`, `wait`, `waitFor`, `expect` (`text`, `visible`, `url`, `title`), `extract`, `screenshot`. Selectors may be CSS, XPath, `text=...`, or `label=Field label`. `{{name}}` placeholders read from `vars` or `extract`. `goto` accepts only `http(s)` URLs. Unknown keys are errors, not silently ignored.
+```js
+expect(vars.headings === 1, 'expected one h1');
+```
+````
+
+Steps: `goto`, `click`, `fill`, `press`, `select`, `check`, `wait`, `waitFor`, `expect` (`text`, `visible`, `url`, `title`, `js`), `extract`, `screenshot`, `evaluate`, `script`, `include`, `if`, `repeat`, `forEach`. Every step accepts `note`, `continueOnError` (record as ignored, carry on) and `retry` (extra attempts, leaf steps). `if`/`repeat`/`forEach`/`retry`/`continueOnError` are JSON-only; Markdown covers the linear steps, `include`, and `js` blocks.
+
+Selectors: CSS, XPath, `text=...`, or `label=Field label`. URLs: absolute `http(s)`, or `/path` joined to `baseUrl` (scenario or project). Unknown keys are errors.
+
+### Variables
+
+`{{name}}` placeholders (dotted paths work: `{{user.id}}`). Precedence, low to high: project `vars` < setup output < scenario `vars` < `--var k=v`. `{{env.NAME}}` reads environment variables, with the project's `.env` file underneath (real environment wins, so CI secrets override local files). Unknown names are errors. Run reports list only variables a run created or changed, never the initial values or `env`.
+
+### JavaScript steps
+
+| Step | Runs | In scope |
+|---|---|---|
+| `evaluate` `{code, as}` | inside the page (`page.evaluate`) | `vars`; `return` a value, stored in `as` |
+| `expect` `{kind:"js", value}` | inside the page, polled until truthy | `vars` |
+| `script` `{code}` or `{file}` | in Node, async | `page`, `vars`, `env`, `expect`, `context` |
+
+`expect(cond, msg)`, `expect.equal(a, b)`, `expect.contains(text, needle)` throw on failure. `script` can set `vars.x = ...` for later steps. `script file` and `include` paths resolve from the scenario file and may not leave the project directory.
+
+> **A scenario is code.** `script` runs in Node with your user's rights, with no sandbox. Do not run scenarios or projects you did not write or review. See [SECURITY.md](SECURITY.md).
+
+### Control flow
+
+```json
+{ "action": "forEach", "items": "names", "as": "name", "steps": [
+    { "action": "fill", "selector": "#q", "value": "{{name}}" },
+    { "action": "click", "selector": "text=Search", "retry": 2 },
+    { "action": "if", "when": { "visible": ".empty" }, "then": [ { "action": "screenshot", "path": "empty-{{name}}.png" } ] }
+] }
+```
+
+`forEach` takes an array or the name of an array variable (`<as>_index` holds the position). `repeat` takes `times` and an optional `as` counter. `if` takes `{"js": "..."}` or `{"visible": "..."}` with `then` and optional `else`. `include` runs another scenario in the same page, optionally with `vars`.
+
+## Projects
+
+A project is a directory with `scenario.project.json`:
+
+```json
+{
+  "name": "my app",
+  "baseUrl": "https://staging.example.com",
+  "vars": { "user": "demo" },
+  "envFile": ".env",
+  "defaults": { "timeout": 10000, "headless": true, "launcher": "./launcher.mjs" },
+  "scenarios": ["scenarios/**/*.{json,md}"],
+  "setup": ["setup/login-check.json"],
+  "teardown": [],
+  "reportDir": "reports"
+}
+```
+
+```bash
+scenario-browser project init [dir]
+scenario-browser project list --dir my-tests
+scenario-browser project run --dir my-tests --tag smoke --grep login --var user=ann
+```
+
+`--tag` may repeat (any match). `setup` scenarios run first; a failure skips the tests, and values they `extract` flow into later scenarios as variables. `teardown` always runs. Each scenario gets a fresh browser context; share steps with `include`, not with browser state.
+
+Exit codes: `0` all passed, `1` any scenario failed, `2` project/config error or nothing matched. The report (`reports/report.json`, `reports/report.html`, failure screenshots in `reports/shots/`) is overwritten each run. Two example projects are in `examples/projects/`.
+
+### GitHub Actions
+
+```yaml
+name: browser-tests
+on: [push, pull_request]
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx scenario-browser project run --dir tests --tag smoke
+        env:
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}   # read in scenarios as {{env.APP_PASSWORD}}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: browser-report, path: tests/reports }
+```
 
 ## CLI
 
 | Command | What it does |
 |---|---|
-| `run <file> [--headed] [--heal] [--save-healed] [--launcher <module>]` | Run a scenario. Exit code 0 on pass, 1 on fail. |
-| `validate <file\|dir>...` | Check scenarios without opening a browser. |
-| `generate "description" [-o file.json]` | AI writes a validated scenario. |
-| `portal [--port 7070]` | Local web UI. |
-| `schema` | Print the JSON Schema. |
+| `run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]]` | Run one scenario. Exit 0 pass, 1 fail. |
+| `validate <file\|dir>...` | Check scenarios and projects, including that `include`/`script file` targets exist. No browser. |
+| `project init\|list\|run` | See Projects. |
+| `portal [--port 7070] [--project dir]` | Local web UI. |
+| `generate "description" [-o file.json]` | Experimental. AI drafts a scenario. |
+| `schema [scenario\|project]` | Print a JSON Schema. |
 
-## AI steps
+## AI steps (experimental)
 
-Set `ANTHROPIC_API_KEY` in your shell (it is read from the environment only, never stored or logged). Optional `SCENARIO_MODEL` overrides the model.
+`generate` and `--heal` are early and can be wrong. Treat their output as a draft you review. Set `ANTHROPIC_API_KEY` in your shell (read from the environment only, never stored or logged). Optional `SCENARIO_MODEL` overrides the model.
 
 ```bash
 export ANTHROPIC_API_KEY=...
-node src/cli.ts generate "open example.com and check the page title" -o my.json
-node src/cli.ts run my.json --heal --save-healed
+scenario-browser generate "open example.com and check the page title" -o my.json
+scenario-browser run my.json --heal --save-healed
 ```
 
-- `generate` asks the model for JSON, validates it against the schema, and retries once with the validation errors. Always review generated scenarios before running them.
-- `--heal`: when a step fails on a selector, a compact list of interactive elements from the current page (tags, ids, labels, text; never field values) is sent to the model, which proposes a replacement. The step is retried once; healed steps are marked in the log. `--save-healed` writes the repaired selectors back to a `.json` scenario.
+- `generate` asks the model for JSON, validates it against the schema, and retries once with the validation errors. Generated scenarios can contain JavaScript: read them before running.
+- `--heal`: when a leaf step fails on a selector, a compact list of interactive elements from the current page (tags, ids, labels, trimmed text; never field values) is sent to the model, which proposes a replacement. The step is retried once and marked `healed` in the report. `--save-healed` writes repaired selectors back to a `.json` scenario.
 
-This sends page structure (element names/text, trimmed) to the Anthropic API. Do not use `--heal` on pages containing data you may not share.
+Both send data to the Anthropic API (your description, or page structure). Do not use them on pages with data you may not share.
 
 ## Custom launcher
 
-By default `run` starts plain Playwright Chromium. `--launcher <module>` swaps that out: the module (a relative/absolute path or a package name) is imported dynamically and its default export (or a named `launch`) is called with `{ headless }`. It must return a Playwright `BrowserContext` or `Page`; the runner closes it (and its browser) at the end. Works together with `--heal`.
+By default `run` starts plain Playwright Chromium. `--launcher <module>` (or `defaults.launcher` in a project) swaps that out: the module (path or package name) is imported dynamically and its default export (or named `launch`) is called with `{ headless }`. It must return a Playwright `BrowserContext` or `Page`; the runner closes it and its browser at the end. Works with `--heal`.
 
 Plain Playwright with your own options (`my-launcher.mjs`):
 
@@ -98,7 +201,7 @@ export default async ({ headless }) => {
 ```
 
 ```bash
-node src/cli.ts run examples/httpbin-html.md --launcher ./my-launcher.mjs --heal
+scenario-browser run examples/httpbin-html.md --launcher ./my-launcher.mjs --heal
 ```
 
 The same acceptable-use rule applies to any launcher.
@@ -106,22 +209,22 @@ The same acceptable-use rule applies to any launcher.
 ## Portal
 
 ```bash
-node src/cli.ts portal      # http://127.0.0.1:7070
+scenario-browser portal --project my-tests      # http://127.0.0.1:7070
 ```
 
-One page: paste or edit a scenario (JSON or Markdown), Validate, Run, read the log, or Generate with AI. It binds to `127.0.0.1` only and rejects non-local `Host` headers. It has no authentication; do not expose it to a network.
+One page: paste or edit a scenario (JSON or Markdown), Validate, Run, read the log, Generate with AI (experimental). With a project it also lists scenarios and tags, runs by tag/grep, and shows the HTML report. It binds to `127.0.0.1`, rejects non-local `Host` headers and cross-origin POSTs, and has no authentication: do not expose it to a network. A scenario containing JavaScript shows a warning and asks for confirmation before it runs.
 
 ## Development
 
 ```bash
-npm run check    # typecheck + tests + validate examples
+npm run check    # typecheck + build + tests + validate examples
 ```
 
-Tests run against a local fixture page (real Chromium) and a mocked Anthropic API; no network or key needed. The example scenarios hit public sites (example.com, httpbin.org), which can change.
+Tests run against local fixture pages (real Chromium) and a mocked Anthropic API; no network or key needed. The example scenarios hit public sites (example.com, httpbin.org), which can change. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Not done yet
 
-Conditionals/loops, `include`, file upload/download steps, iframes, multi-tab, scheduled runs, run history in the portal, streaming logs.
+Iframes, multi-tab, file upload/download steps, `if`/loops in Markdown, parallel runs, scheduled runs, run history in the portal, streaming logs, JUnit XML report, `--var` for non-string values.
 
 ## License
 
