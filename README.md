@@ -262,6 +262,11 @@ Tests run against local fixture pages (real Chromium) and a mocked Anthropic API
 
 Iframes, multi-tab, file upload/download steps, `if`/loops in Markdown, parallel runs, scheduled runs, run history in the portal, streaming logs, JUnit XML report, `--var` for non-string values.
 
+## Maintained by PipeX
+
+scenario-browser is maintained by [PipeX](https://www.pipex.pro/?utm_source=github&utm_medium=readme&utm_campaign=scenario-browser), a small company making Odoo modules and mobile apps.
+Related open source from the same maintainer: [MCP Lite](https://github.com/chiempt/odoo-mcp-lite), a free read-only MCP server module for Odoo (Claude, ChatGPT, Cursor).
+
 ## License
 
 MIT
