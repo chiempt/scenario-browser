@@ -9,7 +9,7 @@ import { runScenario } from './runner.ts';
 
 const USAGE = `scenario-browser <command>
 
-  run <file> [--headed] [--heal] [--save-healed]   run a .json or .md scenario
+  run <file> [--headed] [--heal] [--save-healed] [--launcher mod]   run a .json or .md scenario
   validate <file|dir>...                           check scenarios without a browser
   generate "description" [-o file.json]            AI writes a scenario (needs ANTHROPIC_API_KEY)
   portal [--port 7070]                             local web UI on 127.0.0.1
@@ -55,9 +55,10 @@ const main = async (argv: string[]): Promise<number> => {
     }
     case 'run': {
       const headed = flag(args, '--headed'), heal = flag(args, '--heal'), save = flag(args, '--save-healed');
+      const launcher = option(args, '--launcher');
       const file = args[0];
       if (!file) { console.error(USAGE); return 2; }
-      const report = await runScenario(await loadScenario(file), { headless: !headed, heal, log: console.log });
+      const report = await runScenario(await loadScenario(file), { headless: !headed, heal, log: console.log, ...(launcher ? { launcher } : {}) });
       if (report.healed && save) {
         if (!file.endsWith('.json')) console.error('--save-healed only writes .json scenarios; healed scenario not saved');
         else { await writeFile(file, JSON.stringify(report.healed, null, 2) + '\n'); console.log(`saved healed selectors to ${file}`); }

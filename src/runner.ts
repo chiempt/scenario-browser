@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium, type Locator, type Page } from 'playwright';
+import type { Locator, Page } from 'playwright';
+import { openSession } from './launch.ts';
 import { suggestSelector, type AiOptions } from './ai.ts';
 import { reducedDom } from './dom.ts';
 import type { Scenario, Step } from './schema.ts';
@@ -21,6 +22,8 @@ export interface RunOptions {
   /** Ask the AI for a replacement selector when a step fails on one. */
   heal?: boolean;
   ai?: AiOptions;
+  /** Module path/package exporting a function that returns a BrowserContext or Page. */
+  launcher?: string;
   log?: (line: string) => void;
   /** Where screenshots land. Default: ./runs/<timestamp> */
   outDir?: string;
@@ -98,9 +101,9 @@ export const runScenario = async (scenario: Scenario, opts: RunOptions = {}): Pr
   const records: StepRecord[] = [];
   let healedAny = false;
 
-  const browser = await chromium.launch({ headless: opts.headless ?? scenario.headless ?? true });
+  const session = await openSession(opts.headless ?? scenario.headless ?? true, opts.launcher);
   try {
-    const page = await (await browser.newContext()).newPage();
+    const page = session.page;
     log(`run "${scenario.name}" (${working.length} steps)`);
     for (let i = 0; i < working.length; i++) {
       let step = working[i]!;
@@ -140,6 +143,6 @@ export const runScenario = async (scenario: Scenario, opts: RunOptions = {}): Pr
       ...(healedAny ? { healed: { ...scenario, steps: working } } : {}),
     };
   } finally {
-    await browser.close();
+    await session.close();
   }
 };

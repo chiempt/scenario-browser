@@ -50,7 +50,7 @@ Steps: `goto`, `click`, `fill`, `press`, `select`, `check`, `wait`, `waitFor`, `
 
 | Command | What it does |
 |---|---|
-| `run <file> [--headed] [--heal] [--save-healed]` | Run a scenario. Exit code 0 on pass, 1 on fail. |
+| `run <file> [--headed] [--heal] [--save-healed] [--launcher <module>]` | Run a scenario. Exit code 0 on pass, 1 on fail. |
 | `validate <file\|dir>...` | Check scenarios without opening a browser. |
 | `generate "description" [-o file.json]` | AI writes a validated scenario. |
 | `portal [--port 7070]` | Local web UI. |
@@ -70,6 +70,38 @@ node src/cli.ts run my.json --heal --save-healed
 - `--heal`: when a step fails on a selector, a compact list of interactive elements from the current page (tags, ids, labels, text; never field values) is sent to the model, which proposes a replacement. The step is retried once; healed steps are marked in the log. `--save-healed` writes the repaired selectors back to a `.json` scenario.
 
 This sends page structure (element names/text, trimmed) to the Anthropic API. Do not use `--heal` on pages containing data you may not share.
+
+## Custom launcher
+
+By default `run` starts plain Playwright Chromium. `--launcher <module>` swaps that out: the module (a relative/absolute path or a package name) is imported dynamically and its default export (or a named `launch`) is called with `{ headless }`. It must return a Playwright `BrowserContext` or `Page`; the runner closes it (and its browser) at the end. Works together with `--heal`.
+
+Plain Playwright with your own options (`my-launcher.mjs`):
+
+```js
+import { chromium } from 'playwright';
+
+export default async ({ headless }) => {
+  const browser = await chromium.launch({ headless });
+  return browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
+};
+```
+
+An already-installed Chrome via channel (no Chromium download needed):
+
+```js
+import { chromium } from 'playwright';
+
+export default async ({ headless }) => {
+  const browser = await chromium.launch({ channel: 'chrome', headless });
+  return browser.newContext();
+};
+```
+
+```bash
+node src/cli.ts run examples/httpbin-html.md --launcher ./my-launcher.mjs --heal
+```
+
+The same acceptable-use rule applies to any launcher.
 
 ## Portal
 
