@@ -57,8 +57,8 @@
 const $ = (id) => document.getElementById(id);
 const SAMPLE = { json: JSON.stringify({ name: "Example heading", steps: [
   { action: "goto", url: "https://example.com" },
-  { action: "expect", kind: "text", value: "Example Domain" } ] }, null, 2),
-  md: "# Example heading\n- goto https://example.com\n- expect text \"Example Domain\"\n" };
+  { action: "expect", kind: "title", value: "Example Domain" } ] }, null, 2),
+  md: "# Example heading\n- goto https://example.com\n- expect title \"Example Domain\"\n" };
 $("text").value = SAMPLE.json;
 $("format").onchange = () => { $("text").value = SAMPLE[$("format").value]; };
 const post = async (url, body) => {
