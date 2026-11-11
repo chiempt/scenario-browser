@@ -2,19 +2,24 @@
 import { glob, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { generateScenario } from './ai.ts';
-import { loadScenario } from './load.ts';
-import { startPortal } from './server.ts';
-import { jsonSchema } from './schema.ts';
+import { loadScenario, missingReferences } from './load.ts';
+import { PROJECT_FILE, ProjectError, initProject, listProject, loadProject, runProject } from './project.ts';
 import { runScenario } from './runner.ts';
+import { jsonSchema, projectJsonSchema } from './schema.ts';
+import { startPortal } from './server.ts';
 
 const USAGE = `scenario-browser <command>
 
-  run <file> [--headed] [--heal] [--save-healed] [--launcher mod]   run a .json or .md scenario
-  validate <file|dir>...                           check scenarios without a browser
-  generate "description" [-o file.json]            AI writes a scenario (needs ANTHROPIC_API_KEY)
-  portal [--port 7070]                             local web UI on 127.0.0.1
-  schema                                           print the JSON Schema
+  run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]]
+  validate <file|dir>...                      check scenarios/projects without a browser
+  project init [dir]                          create scenario.project.json + samples
+  project list [--dir d]                      scenarios and tags in a project
+  project run [--dir d] [--tag t]... [--grep text] [--headed] [--heal] [--var k=v] [--report-dir d]
+  generate "description" [-o file.json]       (experimental) AI writes a scenario; needs ANTHROPIC_API_KEY
+  portal [--port 7070] [--project dir]        local web UI on 127.0.0.1
+  schema [scenario|project]                   print a JSON Schema
 
+Scenarios can contain JavaScript (evaluate / script). They are code: only run files you trust.
 Only automate sites you own or have permission to automate.`;
 
 const flag = (args: string[], name: string): boolean => {
@@ -22,22 +27,38 @@ const flag = (args: string[], name: string): boolean => {
   if (i >= 0) args.splice(i, 1);
   return i >= 0;
 };
-const option = (args: string[], name: string): string | undefined => {
-  const i = args.indexOf(name);
-  if (i < 0) return undefined;
-  const v = args[i + 1];
-  args.splice(i, 2);
-  return v;
+const multi = (args: string[], name: string): string[] => {
+  const out: string[] = [];
+  for (let i = args.indexOf(name); i >= 0; i = args.indexOf(name)) { const v = args[i + 1]; args.splice(i, 2); if (v !== undefined) out.push(v); }
+  return out;
 };
+const option = (args: string[], name: string): string | undefined => multi(args, name).pop();
+const parseVars = (pairs: string[]): Record<string, string> =>
+  Object.fromEntries(pairs.map((p) => {
+    const i = p.indexOf('=');
+    if (i < 1) throw new ProjectError(`--var needs k=v, got "${p}"`);
+    return [p.slice(0, i), p.slice(i + 1)];
+  }));
 
 const expand = async (paths: string[]): Promise<string[]> => {
   const files: string[] = [];
   for (const p of paths) {
     if ((await stat(p).catch(() => null))?.isDirectory()) {
-      for await (const f of glob('**/*.{json,md}', { cwd: p })) files.push(path.join(p, f));
+      for await (const f of glob('**/*.{json,md}', { cwd: p })) {
+        if (f.split(path.sep).some((s) => s === 'node_modules' || s === 'reports')) continue;
+        files.push(path.join(p, f));
+      }
     } else files.push(p);
   }
   return files.sort();
+};
+
+/** The nearest enclosing project file, if any, so references are checked against the project root. */
+const projectRootFor = async (file: string): Promise<string> => {
+  for (let d = path.resolve(path.dirname(file)); ; d = path.dirname(d)) {
+    if (await stat(path.join(d, PROJECT_FILE)).catch(() => null)) return d;
+    if (d === path.dirname(d)) return path.resolve(path.dirname(file));
+  }
 };
 
 const main = async (argv: string[]): Promise<number> => {
@@ -48,22 +69,57 @@ const main = async (argv: string[]): Promise<number> => {
       if (!files.length) { console.error('no files'); return 2; }
       let bad = 0;
       for (const f of files) {
-        try { const s = await loadScenario(f); console.log(`ok   ${f} (${s.steps.length} steps)`); }
-        catch (e) { bad++; console.error(`FAIL ${(e as Error).message}`); }
+        try {
+          if (path.basename(f) === PROJECT_FILE) { const lp = await loadProject(f); console.log(`ok   ${f} (project "${lp.project.name}")`); continue; }
+          const s = await loadScenario(f);
+          const problems = await missingReferences(s, path.dirname(path.resolve(f)), await projectRootFor(f));
+          if (problems.length) throw new Error(`${f}:\n${problems.map((p) => `  ${p}`).join('\n')}`);
+          console.log(`ok   ${f} (${s.steps.length} steps)`);
+        } catch (e) { bad++; console.error(`FAIL ${(e as Error).message}`); }
       }
       return bad ? 1 : 0;
     }
     case 'run': {
       const headed = flag(args, '--headed'), heal = flag(args, '--heal'), save = flag(args, '--save-healed');
       const launcher = option(args, '--launcher');
+      const vars = parseVars(multi(args, '--var'));
       const file = args[0];
       if (!file) { console.error(USAGE); return 2; }
-      const report = await runScenario(await loadScenario(file), { headless: !headed, heal, log: console.log, ...(launcher ? { launcher } : {}) });
+      const report = await runScenario(await loadScenario(file), {
+        file, headless: headed ? false : undefined, heal, log: console.log, overrideVars: vars,
+        rootDir: await projectRootFor(file), ...(launcher ? { launcher } : {}),
+      });
       if (report.healed && save) {
         if (!file.endsWith('.json')) console.error('--save-healed only writes .json scenarios; healed scenario not saved');
         else { await writeFile(file, JSON.stringify(report.healed, null, 2) + '\n'); console.log(`saved healed selectors to ${file}`); }
       }
       return report.status === 'passed' ? 0 : 1;
+    }
+    case 'project': {
+      const [sub, ...rest] = args;
+      if (sub === 'init') {
+        const created = await initProject(rest[0] ?? '.');
+        console.log(`created in ${rest[0] ?? '.'}:\n${created.map((c) => `  ${c}`).join('\n')}\nnext: node src/cli.ts project run --dir ${rest[0] ?? '.'}`);
+        return 0;
+      }
+      const dir = option(rest, '--dir') ?? '.';
+      const lp = await loadProject(dir);
+      if (sub === 'list') {
+        for (const s of await listProject(lp)) console.log(`${s.file}  "${s.name}"${s.tags.length ? `  [${s.tags.join(', ')}]` : ''}${s.hasJs ? '  (js)' : ''}${'error' in s ? '  INVALID' : ''}`);
+        return 0;
+      }
+      if (sub === 'run') {
+        const headed = flag(rest, '--headed'), heal = flag(rest, '--heal');
+        const tags = multi(rest, '--tag'), grep = option(rest, '--grep'), reportDir = option(rest, '--report-dir');
+        const vars = parseVars(multi(rest, '--var'));
+        const report = await runProject(lp, {
+          tags, ...(grep ? { grep } : {}), ...(headed ? { headless: false } : {}), heal, vars,
+          ...(reportDir ? { reportDir } : {}), log: console.log,
+        });
+        console.log(`\n${report.status.toUpperCase()}: ${report.counts.passed}/${report.counts.total} passed, ${report.counts.failed} failed${report.note ? ` (${report.note})` : ''}`);
+        return report.status === 'passed' ? 0 : 1;
+      }
+      console.error(USAGE); return 2;
     }
     case 'generate': {
       const out = option(args, '-o');
@@ -75,14 +131,16 @@ const main = async (argv: string[]): Promise<number> => {
     }
     case 'portal': {
       const port = Number(option(args, '--port') ?? 7070);
-      const srv = await startPortal(port);
-      console.log(`portal on http://127.0.0.1:${port}  (Ctrl+C to stop)`);
+      let project = option(args, '--project');
+      if (!project && (await stat(PROJECT_FILE).catch(() => null))) project = '.';
+      const srv = await startPortal(port, '127.0.0.1', project ? await loadProject(project) : undefined);
+      console.log(`portal on http://127.0.0.1:${port}${project ? ` (project: ${project})` : ''}  (Ctrl+C to stop)`);
       await new Promise(() => srv);
       return 0;
     }
-    case 'schema': console.log(JSON.stringify(jsonSchema(), null, 2)); return 0;
+    case 'schema': console.log(JSON.stringify(args[0] === 'project' ? projectJsonSchema() : jsonSchema(), null, 2)); return 0;
     default: console.log(USAGE); return cmd ? 2 : 0;
   }
 };
 
-main(process.argv.slice(2)).then((c) => process.exit(c), (e: Error) => { console.error(e.message); process.exit(1); });
+main(process.argv.slice(2)).then((c) => process.exit(c), (e: Error) => { console.error(e.message); process.exit(e instanceof ProjectError ? 2 : 1); });

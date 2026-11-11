@@ -4,3 +4,6 @@ runs/
 .env.*
 *.log
 .DS_Store
+reports/
+dist/
+*.tgz

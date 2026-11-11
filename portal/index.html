@@ -17,6 +17,9 @@
   button.alt { background:transparent; color:var(--ac); border:1px solid var(--ac); }
   button:disabled { opacity:.5; cursor:wait; }
   pre { border:1px solid var(--bd); border-radius:6px; padding:10px; min-height:120px; white-space:pre-wrap; overflow:auto; font-size:13px; }
+  .warn { border:1px solid #b80; color:#b80; border-radius:6px; padding:8px; margin:8px 0; }
+  #projpanel { border:1px solid var(--bd); border-radius:6px; padding:10px; margin:12px 0; }
+  iframe { width:100%; height:420px; border:1px solid var(--bd); border-radius:6px; background:#fff; }
   .ok { color:#1a8f3c; } .bad { color:#d33; } label { color:var(--mut); }
 </style>
 </head>
@@ -24,6 +27,17 @@
 <main>
   <h1>scenario-browser</h1>
   <p class="sub">Local only. Paste or edit a scenario, validate it, run it, read the log. Use it on sites you own or are allowed to automate.</p>
+  <div id="projpanel" hidden>
+    <b id="projname"></b> <span id="projcount" class="sub"></span>
+    <div id="projlist" class="sub"></div>
+    <div class="row">
+      <input type="text" id="tags" placeholder="tags, comma separated (empty = all)">
+      <input type="text" id="grep" placeholder="name contains...">
+      <button id="runproj">Run project</button>
+    </div>
+    <iframe id="report" title="report" hidden></iframe>
+  </div>
+  <div id="jswarn" class="warn" hidden>This scenario contains JavaScript. Scenarios are code that runs with your user rights: only run ones you wrote or reviewed.</div>
   <div class="row">
     <select id="format" style="width:auto"><option value="json">JSON</option><option value="md">Markdown</option></select>
     <label><input type="checkbox" id="heal"> heal selectors with AI (needs ANTHROPIC_API_KEY on the server)</label>
@@ -53,16 +67,41 @@ const post = async (url, body) => {
 };
 const out = (t, cls) => { const l = $("log"); l.textContent = t; l.className = cls || ""; };
 const payload = () => ({ text: $("text").value, format: $("format").value, heal: $("heal").checked });
+const setWarn = (on) => { $("jswarn").hidden = !on; };
 const busy = (b) => document.querySelectorAll("button").forEach((x) => (x.disabled = b));
 $("validate").onclick = async () => {
   busy(true);
   const r = await post("/api/validate", payload());
-  out(r.ok ? `valid: "${r.name}", ${r.steps} steps` : r.error, r.ok ? "ok" : "bad"); busy(false);
+  setWarn(!!r.hasJs);
+  out(r.ok ? `valid: "${r.name}", ${r.steps} steps${r.hasJs ? " (contains JavaScript)" : ""}` : r.error, r.ok ? "ok" : "bad"); busy(false);
 };
 $("run").onclick = async () => {
   busy(true); out("Running...");
-  const r = await post("/api/run", payload());
+  let r = await post("/api/run", payload());
+  if (r.needsConfirm) {
+    setWarn(true);
+    if (confirm(r.error)) r = await post("/api/run", { ...payload(), confirmJs: true });
+  }
   if (r.error) out(r.error, "bad"); else out(r.log.join("\n") + (r.ok ? "\n\nPASSED" : "\n\nFAILED: " + r.report.error), r.ok ? "ok" : "bad");
+  busy(false);
+};
+(async () => {
+  const r = await (await fetch("/api/project")).json();
+  if (!r.project) return;
+  $("projpanel").hidden = false;
+  $("projname").textContent = "Project: " + r.project.name;
+  $("projcount").textContent = r.project.scenarios.length + " scenarios";
+  $("projlist").textContent = r.project.scenarios.map((s) => s.file + (s.tags.length ? " [" + s.tags.join(", ") + "]" : "") + (s.hasJs ? " (js)" : "")).join("  |  ");
+})();
+$("runproj").onclick = async () => {
+  busy(true); out("Running project...");
+  const tags = $("tags").value.split(",").map((x) => x.trim()).filter(Boolean);
+  const r = await post("/api/project/run", { tags, grep: $("grep").value, heal: $("heal").checked });
+  if (r.error) out(r.error, "bad");
+  else {
+    out(r.log.join("\n") + `\n\n${r.status.toUpperCase()}: ${r.counts.passed}/${r.counts.total} passed`, r.ok ? "ok" : "bad");
+    const f = $("report"); f.hidden = false; f.src = "/reports/report.html?" + Date.now();
+  }
   busy(false);
 };
 $("gen").onclick = async () => {

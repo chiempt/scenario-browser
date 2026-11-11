@@ -1,0 +1,8 @@
+{
+  "name": "setup: fetch a uuid",
+  "steps": [
+    { "action": "goto", "url": "/uuid" },
+    { "action": "extract", "selector": "body", "as": "uuid" },
+    { "action": "expect", "kind": "js", "value": "document.body.innerText.includes('uuid')" }
+  ]
+}

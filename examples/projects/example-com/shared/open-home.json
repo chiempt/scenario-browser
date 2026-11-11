@@ -1,0 +1,1 @@
+{ "name": "open home (shared)", "steps": [ { "action": "goto", "url": "/" }, { "action": "expect", "kind": "title", "value": "Example Domain" } ] }

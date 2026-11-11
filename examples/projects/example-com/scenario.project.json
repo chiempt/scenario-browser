@@ -1,0 +1,7 @@
+{
+  "name": "example.com checks",
+  "baseUrl": "https://example.com",
+  "vars": { "needle": "documentation examples" },
+  "defaults": { "timeout": 10000 },
+  "scenarios": ["scenarios/**/*.{json,md}"]
+}

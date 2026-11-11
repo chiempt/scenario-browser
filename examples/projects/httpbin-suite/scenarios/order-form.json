@@ -1,0 +1,12 @@
+{
+  "name": "order form submits",
+  "tags": ["smoke", "forms"],
+  "steps": [
+    { "action": "goto", "url": "/forms/post" },
+    { "action": "fill", "selector": "input[name=custname]", "value": "{{customer}}" },
+    { "action": "fill", "selector": "textarea[name=comments]", "value": "run {{uuid}}" },
+    { "action": "check", "selector": "input[value=bacon]" },
+    { "action": "click", "selector": "button" },
+    { "action": "expect", "kind": "js", "value": "document.body.innerText.includes(vars.customer)" }
+  ]
+}

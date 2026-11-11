@@ -1,0 +1,9 @@
+{
+  "name": "httpbin suite",
+  "baseUrl": "https://httpbin.org",
+  "vars": { "customer": "Test User", "names": ["Ann", "Bo", "Cy"] },
+  "defaults": { "timeout": 15000 },
+  "setup": ["setup/get-uuid.json"],
+  "scenarios": ["scenarios/**/*.{json,md}"],
+  "reportDir": "reports"
+}

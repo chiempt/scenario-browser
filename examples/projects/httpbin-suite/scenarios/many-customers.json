@@ -1,0 +1,17 @@
+{
+  "name": "form accepts each name",
+  "tags": ["forms", "loop"],
+  "steps": [
+    {
+      "action": "forEach", "items": "names", "as": "name",
+      "steps": [
+        { "action": "goto", "url": "/forms/post" },
+        { "action": "fill", "selector": "input[name=custname]", "value": "{{name}}" },
+        { "action": "click", "selector": "button", "retry": 1 },
+        { "action": "if", "when": { "visible": "pre" },
+          "then": [ { "action": "expect", "kind": "text", "value": "{{name}}" } ],
+          "else": [ { "action": "screenshot", "path": "no-pre-{{name}}.png" } ] }
+      ]
+    }
+  ]
+}

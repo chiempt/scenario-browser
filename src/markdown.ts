@@ -22,6 +22,14 @@ import type { Scenario, Step } from './schema.ts';
  *   - screenshot out.png
  *
  * `set name = value` bullets define {{name}} variables.
+ *
+ *   tags: smoke, login          (a line before the steps)
+ *   - include ./login.md
+ *   - expect js "document.title.length > 0"
+ *
+ * A fenced ```js block is a Node-side `script` step (page, vars, env, expect in
+ * scope). ```js evaluate as name  runs inside the page and stores the result.
+ * Control flow (if/repeat/forEach), retry and continueOnError are JSON-only.
  */
 export class MarkdownError extends Error {}
 
@@ -62,6 +70,7 @@ const parseStep = (line: string): Step => {
   const t = tokenize(line);
   const verb = t[0]?.text;
   switch (verb) {
+    case 'include': return { action: 'include', file: val(t[1], line) };
     case 'goto': return { action: 'goto', url: val(t[1], line) };
     case 'click': return { action: 'click', selector: sel(t[1], line) };
     case 'check': return { action: 'check', selector: sel(t[1], line) };
@@ -84,7 +93,7 @@ const parseStep = (line: string): Step => {
     case 'expect': {
       const kind = t[1]?.text;
       if (kind === 'visible') return { action: 'expect', kind, selector: sel(t[2], line) };
-      if (kind === 'text' || kind === 'url' || kind === 'title') {
+      if (kind === 'text' || kind === 'url' || kind === 'title' || kind === 'js') {
         return t.length >= 4
           ? { action: 'expect', kind, selector: sel(t[2], line), value: val(t[3], line) }
           : { action: 'expect', kind, value: val(t[2], line) };
@@ -101,11 +110,31 @@ export const parseMarkdown = (source: string): Scenario => {
   const desc: string[] = [];
   const steps: Step[] = [];
   const vars: Record<string, string> = {};
-  for (const raw of source.split(/\r?\n/)) {
-    const line = raw.trim();
+  let tags: string[] | undefined;
+  const lines = source.split(/\r?\n/);
+  for (let n = 0; n < lines.length; n++) {
+    const line = lines[n]!.trim();
     if (!line) continue;
+    const fence = /^```js\b(.*)$/.exec(line);
+    if (fence) {
+      const body: string[] = [];
+      n++;
+      while (n < lines.length && !/^```\s*$/.test(lines[n]!.trim())) body.push(lines[n++]!);
+      if (n >= lines.length) throw new MarkdownError('unterminated js code block');
+      const info = fence[1]!.trim();
+      const code = body.join('\n');
+      if (info.startsWith('evaluate')) {
+        const as = /^evaluate(?:\s+as\s+([A-Za-z_]\w*))?$/.exec(info);
+        if (!as) throw new MarkdownError('use: js evaluate as <name>, got: ' + info);
+        steps.push({ action: 'evaluate', code, ...(as[1] ? { as: as[1] } : {}) });
+      } else if (info === '') steps.push({ action: 'script', code });
+      else throw new MarkdownError(`unknown js block option "${info}"`);
+      continue;
+    }
     const h = /^#\s+(.+)$/.exec(line);
     if (h && !name) { name = h[1]!.trim(); continue; }
+    const tg = /^tags:\s*(.+)$/i.exec(line);
+    if (tg && !steps.length) { tags = tg[1]!.split(',').map((x) => x.trim()).filter(Boolean); continue; }
     const b = /^[-*]\s+(.+)$/.exec(line);
     if (b) {
       const body = b[1]!.trim();
@@ -118,6 +147,7 @@ export const parseMarkdown = (source: string): Scenario => {
   return {
     name,
     ...(desc.length ? { description: desc.join(' ') } : {}),
+    ...(tags ? { tags } : {}),
     ...(Object.keys(vars).length ? { vars } : {}),
     steps,
   };

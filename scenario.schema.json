@@ -12,6 +12,19 @@
     "description": {
       "type": "string"
     },
+    "tags": {
+      "description": "Labels for `project run --tag`.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "baseUrl": {
+      "description": "Joined to /path URLs. Overrides the project baseUrl.",
+      "type": "string",
+      "pattern": "^https?:\\/\\/"
+    },
     "headless": {
       "description": "Default true.",
       "type": "boolean"
@@ -23,303 +36,20 @@
       "maximum": 120000
     },
     "vars": {
-      "description": "Values for {{name}} placeholders.",
+      "description": "Values for {{name}} placeholders (strings, numbers, arrays...).",
       "type": "object",
       "propertyNames": {
         "type": "string"
       },
       "additionalProperties": {
-        "type": "string"
+        "$ref": "#/$defs/__schema0"
       }
     },
     "steps": {
       "minItems": 1,
       "type": "array",
       "items": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "goto"
-              },
-              "url": {
-                "type": "string",
-                "description": "Absolute http(s) URL. {{vars}} are allowed."
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "url"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "click"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "selector"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "fill"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "value": {
-                "type": "string"
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "selector",
-              "value"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "press"
-              },
-              "key": {
-                "type": "string",
-                "minLength": 1
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "key"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "select"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "value": {
-                "type": "string"
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "selector",
-              "value"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "check"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "selector"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "wait"
-              },
-              "ms": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 60000
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "ms"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "waitFor"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "selector"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "expect"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "text",
-                  "visible",
-                  "url",
-                  "title"
-                ],
-                "description": "text: page (or selector) contains value. visible: selector shown. url/title: contains value."
-              },
-              "value": {
-                "description": "Expected text/url/title. Not used by kind=visible.",
-                "type": "string"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "kind"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "extract"
-              },
-              "selector": {
-                "type": "string",
-                "minLength": 1,
-                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
-              },
-              "as": {
-                "type": "string",
-                "pattern": "^[A-Za-z_]\\w*$"
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "selector",
-              "as"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
-                "const": "screenshot"
-              },
-              "path": {
-                "type": "string",
-                "minLength": 1
-              },
-              "note": {
-                "description": "Free-form comment shown in the log.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "action",
-              "path"
-            ],
-            "additionalProperties": false
-          }
-        ]
+        "$ref": "#/$defs/__schema1"
       }
     }
   },
@@ -327,5 +57,761 @@
     "name",
     "steps"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      ]
+    },
+    "__schema1": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "goto"
+            },
+            "url": {
+              "type": "string",
+              "description": "Absolute http(s) URL, or a /path joined to baseUrl. {{vars}} are allowed."
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "url"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "click"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "selector"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "fill"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "value": {
+              "type": "string"
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "selector",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "press"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "select"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "value": {
+              "type": "string"
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "selector",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "check"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "selector"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "wait"
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 60000
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "ms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "waitFor"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "selector"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "expect"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "text",
+                "visible",
+                "url",
+                "title",
+                "js"
+              ],
+              "description": "text: page (or selector) contains value. visible: selector shown. url/title: contains value. js: expression (in the page) is truthy."
+            },
+            "value": {
+              "description": "Expected text/url/title, or the JS expression for kind=js.",
+              "type": "string"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "extract"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1,
+              "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+            },
+            "as": {
+              "type": "string",
+              "pattern": "^[A-Za-z_]\\w*$"
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "selector",
+            "as"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "screenshot"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "evaluate"
+            },
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Function body run inside the page via page.evaluate. `vars` is in scope; use `return` to produce a value."
+            },
+            "as": {
+              "description": "Variable that receives the returned value.",
+              "type": "string",
+              "pattern": "^[A-Za-z_]\\w*$"
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "code"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "script"
+            },
+            "code": {
+              "description": "Inline Node.js (async) body. In scope: page, vars, env, expect, context.",
+              "type": "string",
+              "minLength": 1
+            },
+            "file": {
+              "description": "Script file, relative to the scenario file, must stay inside the project.",
+              "type": "string",
+              "minLength": 1
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "include"
+            },
+            "file": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Another scenario (.json/.md), relative to this file. Its steps run in the same page."
+            },
+            "vars": {
+              "description": "Variables passed to the included scenario ({{}} allowed).",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "file"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "if"
+            },
+            "when": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "js": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Expression run in the page; truthy means true. `vars` is in scope."
+                    }
+                  },
+                  "required": [
+                    "js"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "visible": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+                    }
+                  },
+                  "required": [
+                    "visible"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "then": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "else": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "when",
+            "then"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "repeat"
+            },
+            "times": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "as": {
+              "description": "Variable receiving the 0-based iteration number.",
+              "type": "string",
+              "pattern": "^[A-Za-z_]\\w*$"
+            },
+            "steps": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "times",
+            "steps"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "forEach"
+            },
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema2"
+                  }
+                }
+              ],
+              "description": "An array, or the name of a variable holding an array (or a JSON array string)."
+            },
+            "as": {
+              "type": "string",
+              "pattern": "^[A-Za-z_]\\w*$",
+              "description": "Variable receiving each item; <as>_index receives the position."
+            },
+            "steps": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "note": {
+              "description": "Free-form comment shown in the log.",
+              "type": "string"
+            },
+            "continueOnError": {
+              "description": "If this step fails, record it as ignored and carry on.",
+              "type": "boolean"
+            },
+            "retry": {
+              "description": "Extra attempts for a failing step (leaf steps).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "action",
+            "items",
+            "as",
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema2": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema2"
+          }
+        }
+      ]
+    }
+  }
 }

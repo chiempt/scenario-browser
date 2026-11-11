@@ -1,0 +1,11 @@
+{
+  "name": "home page copy",
+  "tags": ["smoke"],
+  "steps": [
+    { "action": "include", "file": "../shared/open-home.json" },
+    { "action": "script", "file": "../scripts/check-copy.js" },
+    { "action": "expect", "kind": "js", "value": "vars.wordCount > 5" },
+    { "action": "click", "selector": "text=This link does not exist", "continueOnError": true, "note": "optional element, failure is ignored" },
+    { "action": "repeat", "times": 2, "as": "n", "steps": [ { "action": "expect", "kind": "visible", "selector": "p" } ] }
+  ]
+}

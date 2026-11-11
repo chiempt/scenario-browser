@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseUrl": {
+      "type": "string",
+      "pattern": "^https?:\\/\\/"
+    },
+    "vars": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema0"
+      }
+    },
+    "envFile": {
+      "description": "Dotenv file read for {{env.X}}. Default \".env\". Real environment variables win.",
+      "type": "string"
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 120000
+        },
+        "headless": {
+          "type": "boolean"
+        },
+        "launcher": {
+          "description": "Launcher module, relative to the project.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scenarios": {
+      "description": "Globs relative to the project. Default [\"scenarios/**/*.{json,md}\"].",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "setup": {
+      "description": "Scenarios run first. A failure stops the run. Their extracted vars flow into later scenarios.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "teardown": {
+      "description": "Scenarios always run last.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reportDir": {
+      "description": "Default \"reports\".",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      ]
+    }
+  }
+}
