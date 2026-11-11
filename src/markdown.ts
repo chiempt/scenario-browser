@@ -1,0 +1,124 @@
+import type { Scenario, Step } from './schema.ts';
+
+/**
+ * Markdown scenarios: a `# Title`, optional paragraph lines, then one step per
+ * `- ` bullet.
+ *
+ *   - goto https://example.com
+ *   - click "Login"              quoted = visible text (text=Login)
+ *   - click #submit              unquoted = CSS/XPath/Playwright selector
+ *   - fill #q "hello"
+ *   - fill label=Email "a@b.c"
+ *   - press Enter                or: press #q Enter
+ *   - select #country "VN"
+ *   - check #agree
+ *   - wait 500                   milliseconds
+ *   - waitFor .results
+ *   - expect text "Example Domain"
+ *   - expect url "example.com"
+ *   - expect title "Example"
+ *   - expect visible h1
+ *   - extract h1 as heading
+ *   - screenshot out.png
+ *
+ * `set name = value` bullets define {{name}} variables.
+ */
+export class MarkdownError extends Error {}
+
+/** Splits a line into tokens; "double quoted" tokens keep spaces and are flagged. */
+const tokenize = (line: string): { text: string; quoted: boolean }[] => {
+  const out: { text: string; quoted: boolean }[] = [];
+  let i = 0;
+  while (i < line.length) {
+    if (/\s/.test(line[i]!)) { i++; continue; }
+    if (line[i] === '"') {
+      let j = i + 1, buf = '';
+      while (j < line.length && line[j] !== '"') {
+        if (line[j] === '\\' && j + 1 < line.length) { buf += line[j + 1]; j += 2; } else buf += line[j++];
+      }
+      if (j >= line.length) throw new MarkdownError(`unterminated quote in: ${line}`);
+      out.push({ text: buf, quoted: true });
+      i = j + 1;
+    } else {
+      let j = i;
+      while (j < line.length && !/\s/.test(line[j]!)) j++;
+      out.push({ text: line.slice(i, j), quoted: false });
+      i = j;
+    }
+  }
+  return out;
+};
+
+const sel = (t: { text: string; quoted: boolean } | undefined, line: string): string => {
+  if (!t) throw new MarkdownError(`missing selector in: ${line}`);
+  return t.quoted ? `text=${t.text}` : t.text;
+};
+const val = (t: { text: string } | undefined, line: string): string => {
+  if (!t) throw new MarkdownError(`missing value in: ${line}`);
+  return t.text;
+};
+
+const parseStep = (line: string): Step => {
+  const t = tokenize(line);
+  const verb = t[0]?.text;
+  switch (verb) {
+    case 'goto': return { action: 'goto', url: val(t[1], line) };
+    case 'click': return { action: 'click', selector: sel(t[1], line) };
+    case 'check': return { action: 'check', selector: sel(t[1], line) };
+    case 'waitFor': return { action: 'waitFor', selector: sel(t[1], line) };
+    case 'fill': return { action: 'fill', selector: sel(t[1], line), value: val(t[2], line) };
+    case 'select': return { action: 'select', selector: sel(t[1], line), value: val(t[2], line) };
+    case 'press':
+      return t.length >= 3
+        ? { action: 'press', selector: sel(t[1], line), key: val(t[2], line) }
+        : { action: 'press', key: val(t[1], line) };
+    case 'wait': {
+      const ms = Number(val(t[1], line));
+      if (!Number.isInteger(ms)) throw new MarkdownError(`wait needs milliseconds: ${line}`);
+      return { action: 'wait', ms };
+    }
+    case 'screenshot': return { action: 'screenshot', path: val(t[1], line) };
+    case 'extract':
+      if (t[2]?.text !== 'as') throw new MarkdownError(`use: extract <selector> as <name>: ${line}`);
+      return { action: 'extract', selector: sel(t[1], line), as: val(t[3], line) };
+    case 'expect': {
+      const kind = t[1]?.text;
+      if (kind === 'visible') return { action: 'expect', kind, selector: sel(t[2], line) };
+      if (kind === 'text' || kind === 'url' || kind === 'title') {
+        return t.length >= 4
+          ? { action: 'expect', kind, selector: sel(t[2], line), value: val(t[3], line) }
+          : { action: 'expect', kind, value: val(t[2], line) };
+      }
+      throw new MarkdownError(`expect needs text|visible|url|title: ${line}`);
+    }
+    default:
+      throw new MarkdownError(`unknown step "${verb ?? ''}" in: ${line}`);
+  }
+};
+
+export const parseMarkdown = (source: string): Scenario => {
+  let name = '';
+  const desc: string[] = [];
+  const steps: Step[] = [];
+  const vars: Record<string, string> = {};
+  for (const raw of source.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const h = /^#\s+(.+)$/.exec(line);
+    if (h && !name) { name = h[1]!.trim(); continue; }
+    const b = /^[-*]\s+(.+)$/.exec(line);
+    if (b) {
+      const body = b[1]!.trim();
+      const set = /^set\s+([A-Za-z_]\w*)\s*=\s*(.*)$/.exec(body);
+      if (set) vars[set[1]!] = set[2]!.replace(/^"(.*)"$/, '$1');
+      else steps.push(parseStep(body));
+    } else if (!line.startsWith('#')) desc.push(line);
+  }
+  if (!name) throw new MarkdownError('missing "# Title" line');
+  return {
+    name,
+    ...(desc.length ? { description: desc.join(' ') } : {}),
+    ...(Object.keys(vars).length ? { vars } : {}),
+    steps,
+  };
+};

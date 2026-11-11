@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scenario-browser portal</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fff; --fg:#1b1b1f; --mut:#666; --bd:#d0d0d8; --ac:#2457d6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16161a; --fg:#eee; --mut:#999; --bd:#3a3a44; --ac:#6c93ff; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:0 0 4px; } p.sub { color:var(--mut); margin:0 0 12px; }
+  textarea, input[type=text], select { width:100%; box-sizing:border-box; background:transparent; color:inherit; border:1px solid var(--bd); border-radius:6px; padding:8px; font:13px/1.45 ui-monospace, monospace; }
+  textarea { min-height:260px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  button { background:var(--ac); color:#fff; border:0; border-radius:6px; padding:8px 14px; font:inherit; cursor:pointer; }
+  button.alt { background:transparent; color:var(--ac); border:1px solid var(--ac); }
+  button:disabled { opacity:.5; cursor:wait; }
+  pre { border:1px solid var(--bd); border-radius:6px; padding:10px; min-height:120px; white-space:pre-wrap; overflow:auto; font-size:13px; }
+  .ok { color:#1a8f3c; } .bad { color:#d33; } label { color:var(--mut); }
+</style>
+</head>
+<body>
+<main>
+  <h1>scenario-browser</h1>
+  <p class="sub">Local only. Paste or edit a scenario, validate it, run it, read the log. Use it on sites you own or are allowed to automate.</p>
+  <div class="row">
+    <select id="format" style="width:auto"><option value="json">JSON</option><option value="md">Markdown</option></select>
+    <label><input type="checkbox" id="heal"> heal selectors with AI (needs ANTHROPIC_API_KEY on the server)</label>
+  </div>
+  <textarea id="text" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="validate" class="alt">Validate</button>
+    <button id="run">Run</button>
+  </div>
+  <div class="row">
+    <input type="text" id="desc" placeholder="Describe a scenario for AI to write, e.g. open example.com and check the heading">
+    <button id="gen" class="alt">Generate</button>
+  </div>
+  <pre id="log" aria-live="polite">Ready.</pre>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const SAMPLE = { json: JSON.stringify({ name: "Example heading", steps: [
+  { action: "goto", url: "https://example.com" },
+  { action: "expect", kind: "text", value: "Example Domain" } ] }, null, 2),
+  md: "# Example heading\n- goto https://example.com\n- expect text \"Example Domain\"\n" };
+$("text").value = SAMPLE.json;
+$("format").onchange = () => { $("text").value = SAMPLE[$("format").value]; };
+const post = async (url, body) => {
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return r.json();
+};
+const out = (t, cls) => { const l = $("log"); l.textContent = t; l.className = cls || ""; };
+const payload = () => ({ text: $("text").value, format: $("format").value, heal: $("heal").checked });
+const busy = (b) => document.querySelectorAll("button").forEach((x) => (x.disabled = b));
+$("validate").onclick = async () => {
+  busy(true);
+  const r = await post("/api/validate", payload());
+  out(r.ok ? `valid: "${r.name}", ${r.steps} steps` : r.error, r.ok ? "ok" : "bad"); busy(false);
+};
+$("run").onclick = async () => {
+  busy(true); out("Running...");
+  const r = await post("/api/run", payload());
+  if (r.error) out(r.error, "bad"); else out(r.log.join("\n") + (r.ok ? "\n\nPASSED" : "\n\nFAILED: " + r.report.error), r.ok ? "ok" : "bad");
+  busy(false);
+};
+$("gen").onclick = async () => {
+  busy(true); out("Asking the model...");
+  const r = await post("/api/generate", { description: $("desc").value });
+  if (r.ok) { $("format").value = "json"; $("text").value = JSON.stringify(r.scenario, null, 2); out("Generated. Review it before running.", "ok"); }
+  else out(r.error, "bad");
+  busy(false);
+};
+</script>
+</body>
+</html>

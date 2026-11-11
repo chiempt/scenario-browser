@@ -1,0 +1,15 @@
+{
+  "name": "httpbin order form",
+  "description": "Fills the public httpbin practice form and submits it.",
+  "timeout": 15000,
+  "steps": [
+    { "action": "goto", "url": "https://httpbin.org/forms/post" },
+    { "action": "fill", "selector": "input[name=custname]", "value": "Test User" },
+    { "action": "fill", "selector": "input[name=custtel]", "value": "000-000-0000" },
+    { "action": "check", "selector": "input[value=medium]" },
+    { "action": "check", "selector": "input[value=bacon]" },
+    { "action": "fill", "selector": "textarea[name=comments]", "value": "scenario-browser test" },
+    { "action": "click", "selector": "button" },
+    { "action": "expect", "kind": "text", "value": "Test User" }
+  ]
+}

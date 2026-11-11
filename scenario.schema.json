@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "headless": {
+      "description": "Default true.",
+      "type": "boolean"
+    },
+    "timeout": {
+      "description": "Per-step timeout in ms. Default 10000.",
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 120000
+    },
+    "vars": {
+      "description": "Values for {{name}} placeholders.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "goto"
+              },
+              "url": {
+                "type": "string",
+                "description": "Absolute http(s) URL. {{vars}} are allowed."
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "click"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "selector"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "fill"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "value": {
+                "type": "string"
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "selector",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "press"
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "key"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "select"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "value": {
+                "type": "string"
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "selector",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "check"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "selector"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "wait"
+              },
+              "ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 60000
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "ms"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "waitFor"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "selector"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "expect"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "visible",
+                  "url",
+                  "title"
+                ],
+                "description": "text: page (or selector) contains value. visible: selector shown. url/title: contains value."
+              },
+              "value": {
+                "description": "Expected text/url/title. Not used by kind=visible.",
+                "type": "string"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "extract"
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CSS, XPath, Playwright selector (text=Login), or label=Field label."
+              },
+              "as": {
+                "type": "string",
+                "pattern": "^[A-Za-z_]\\w*$"
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "selector",
+              "as"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "screenshot"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "note": {
+                "description": "Free-form comment shown in the log.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "steps"
+  ],
+  "additionalProperties": false
+}

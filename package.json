@@ -1,0 +1,28 @@
+{
+  "name": "scenario-browser",
+  "version": "0.1.0",
+  "description": "Run browser automation from small JSON or Markdown scenarios, with optional AI to write them and repair broken selectors.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=23.6" },
+  "bin": { "scenario-browser": "src/cli.ts" },
+  "scripts": {
+    "cli": "node src/cli.ts",
+    "portal": "node src/cli.ts portal",
+    "validate": "node src/cli.ts validate examples",
+    "schema": "node src/cli.ts schema > scenario.schema.json",
+    "typecheck": "tsc --noEmit",
+    "browser:install": "playwright install chromium",
+    "test": "node --test \"test/*.test.ts\"",
+    "check": "npm run typecheck && npm test && npm run validate"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

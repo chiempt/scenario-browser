@@ -1,0 +1,12 @@
+{
+  "name": "example.com page check",
+  "description": "Opens the IANA example page and checks its title and text.",
+  "steps": [
+    { "action": "goto", "url": "https://example.com" },
+    { "action": "expect", "kind": "title", "value": "Example Domain" },
+    { "action": "extract", "selector": "p", "as": "intro" },
+    { "action": "expect", "kind": "text", "value": "documentation examples" },
+    { "action": "expect", "kind": "visible", "selector": "p" },
+    { "action": "screenshot", "path": "example-com.png" }
+  ]
+}
