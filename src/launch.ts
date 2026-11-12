@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { chromium, type BrowserContext, type Page } from 'playwright';
+import { launchContext } from 'cloakbrowser';
+import type { BrowserContext, Page } from 'playwright-core';
 
 export interface LaunchOptions { headless: boolean }
 /** What a launcher module's exported function may return. */
@@ -34,9 +35,8 @@ export const loadLauncher = async (spec: string): Promise<LauncherFn> => {
   return fn as LauncherFn;
 };
 
-/** Default: plain Playwright Chromium. */
-export const defaultLauncher: LauncherFn = async ({ headless }) =>
-  (await (await chromium.launch({ headless })).newContext());
+/** Default: CloakBrowser (stealth Chromium, Playwright API). */
+export const defaultLauncher: LauncherFn = ({ headless }) => launchContext({ headless });
 
 export const openSession = async (headless: boolean, launcher?: string): Promise<Session> => {
   const fn = launcher ? await loadLauncher(launcher) : defaultLauncher;

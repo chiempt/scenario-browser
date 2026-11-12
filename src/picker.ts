@@ -1,4 +1,5 @@
-import { chromium, type Browser, type Page } from 'playwright';
+import { launch } from 'cloakbrowser';
+import type { Browser, Page } from 'playwright-core';
 
 export interface PickCandidate { kind: 'xpath' | 'css' | 'text' | 'role' | 'testid' | 'label' | 'placeholder'; selector: string; matches?: number }
 export interface Pick { tag: string; text: string; url: string; candidates: PickCandidate[]; at: string }
@@ -98,7 +99,7 @@ export interface PickerSession {
 /** Opens a normal Playwright browser on `url`; every click on the page becomes a Pick (with locator suggestions) instead of acting. */
 export const startPicker = async (url: string, opts: { headless?: boolean; onPick?: (p: Pick) => void } = {}): Promise<PickerSession> => {
   if (!/^https?:\/\//i.test(url)) throw new Error('the picker only opens http(s) URLs');
-  const browser: Browser = await chromium.launch({ headless: opts.headless ?? false });
+  const browser: Browser = await launch({ headless: opts.headless ?? false });
   try {
     const context = await browser.newContext();
     const picks: Pick[] = [];

@@ -1,4 +1,4 @@
-import type { Page } from 'playwright';
+import type { Page } from 'playwright-core';
 
 export interface DomItem {
   tag: string; id?: string; name?: string; type?: string; role?: string; text?: string;
