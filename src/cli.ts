@@ -5,7 +5,6 @@ import { generateScenario } from './ai.ts';
 import { explainScenario } from './explain.ts';
 import { applyLock } from './lock.ts';
 import { startPicker } from './picker.ts';
-import { listProfiles, openProfile, profilePath } from './profile.ts';
 import { loadScenario, missingReferences } from './load.ts';
 import { PROJECT_FILE, ProjectError, initProject, listProject, loadProject, runProject } from './project.ts';
 import { runScenario } from './runner.ts';
@@ -16,8 +15,6 @@ const USAGE = `scenario-browser <command>
 
   run <file> [--headed] [--var k=v] [--launcher mod] [--heal [--save-healed]] [--lock] [--no-ai]
   explain <file>                              print a scenario as plain sentences
-  profile open <name> [url]                   open a persistent browser profile so you can log in (kept between runs)
-  profile list                                list saved profiles
   pick <url>                                  open the page, click an element, get XPath/CSS/text/role suggestions
   validate <file|dir>...                      check scenarios/projects without a browser
   project init [dir]                          create scenario.project.json + samples
@@ -134,18 +131,6 @@ const main = async (argv: string[]): Promise<number> => {
     case 'explain': {
       if (!args[0]) { console.error(USAGE); return 2; }
       console.log(explainScenario(await loadScenario(args[0])));
-      return 0;
-    }
-    case 'profile': {
-      const [sub, name, url] = args;
-      if (sub === 'list') { for (const n of await listProfiles()) console.log(n); return 0; }
-      if (sub !== 'open' || !name) { console.error(USAGE); return 2; }
-      const ctx = await openProfile(name);
-      const page = ctx.pages()[0] ?? (await ctx.newPage());
-      if (url) await page.goto(url).catch((e) => console.error(String(e)));
-      console.log(`Profile "${name}" (${profilePath(name)}). Log in, then close the window or press Ctrl+C to save and exit.`);
-      await new Promise<void>((resolve) => { ctx.on('close', () => resolve()); process.once('SIGINT', () => resolve()); });
-      await ctx.close().catch(() => {});
       return 0;
     }
     case 'pick': {

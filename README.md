@@ -21,7 +21,7 @@ Browser tests and automations as small **scenario files** (JSON or Markdown), or
 ## Quickstart
 
 ```bash
-npm install scenario-browser && npx cloakbrowser install   # or clone this repo: npm install && npm run browser:install
+npm install scenario-browser && npx playwright install chromium   # or clone this repo: npm install && npm run browser:install
 npx scenario-browser project init my-tests
 npx scenario-browser project run --dir my-tests --tag smoke       # opens my-tests/reports/report.html afterwards
 ```
@@ -153,7 +153,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
       - run: npm ci
-      - run: npx cloakbrowser install
+      - run: npx playwright install --with-deps chromium
       - run: npx scenario-browser project run --dir tests --tag smoke
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}   # read in scenarios as {{env.APP_PASSWORD}}
@@ -276,7 +276,7 @@ Claude Code:
 claude mcp add scenario-browser -- npx -y -p scenario-browser scenario-browser-mcp
 ```
 
-The browser is CloakBrowser (stealth Chromium, Playwright API): run `npx cloakbrowser install` once.
+Browsers come from Playwright: run `npx playwright install chromium` once.
 
 > **Safety.** A scenario is code. With `allowScript` on, it runs in Node with your user's rights and no sandbox, and even without it a scenario can open any URL your machine can reach. Only run scenarios you wrote or reviewed, and keep the server's working directory limited to the scenarios you mean to expose.
 

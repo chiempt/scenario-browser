@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { BrowserContext, Locator, Page } from 'playwright-core';
+import type { BrowserContext, Locator, Page } from 'playwright';
 import { AiError, locateElement, suggestSelector, type AiOptions } from './ai.ts';
 import { loadContext } from './context.ts';
 import { reducedDom } from './dom.ts';

@@ -1,4 +1,4 @@
-import type { Locator, Page } from 'playwright-core';
+import type { Locator, Page } from 'playwright';
 
 /**
  * Selector strings. A prefix picks the strategy; no prefix means "whatever

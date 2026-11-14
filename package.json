@@ -27,8 +27,8 @@
     "validate": "node src/cli.ts validate examples",
     "schema": "node src/cli.ts schema > scenario.schema.json && node src/cli.ts schema project > scenario.project.schema.json",
     "typecheck": "tsc --noEmit",
-    "browser:install": "cloakbrowser install",
-    "test": "node --test --test-concurrency=1 \"test/*.test.ts\"",
+    "browser:install": "playwright install chromium",
+    "test": "node --test \"test/*.test.ts\"",
     "check": "npm run typecheck && npm run build && npm test && npm run validate",
     "build": "tsc -p tsconfig.build.json",
     "prepare": "tsc -p tsconfig.build.json",
@@ -58,8 +58,7 @@
   "homepage": "https://github.com/chiempt/scenario-browser#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "cloakbrowser": "=0.5.10",
-    "playwright-core": "^1.65.0",
+    "playwright": "^1.56.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {
